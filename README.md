@@ -70,3 +70,10 @@ go run ./cmd/thermocktat -config config.yaml
 ```
 
 If no config is provided, default values will be used and server will run on port 8080.
+
+Can also run with environment variables (which have priority over config) :
+```sh
+THERMOCKSTAT_HTTP_ADDR=:3001 go run ./cmd/thermocktat
+# or
+PORT=3001 go run ./cmd/thermocktat
+```

@@ -22,7 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	app.ApplyEnvOverrides(&cfg)
 	snap, err := cfg.Snapshot()
 	if err != nil {
 		log.Fatal(err)

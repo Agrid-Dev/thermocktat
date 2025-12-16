@@ -126,3 +126,16 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 		AmbientTemperature:     ambient,
 	}, nil
 }
+
+func ApplyEnvOverrides(cfg *Config) {
+	// Explicit addr prefered, else support PORT (common in containers).
+	if v := os.Getenv("THERMOCKSTAT_HTTP_ADDR"); v != "" {
+		cfg.HTTP.Addr = v
+		return
+	}
+	if v := os.Getenv("PORT"); v != "" {
+		// listen on all interfaces on that port
+		cfg.HTTP.Addr = ":" + v
+		return
+	}
+}
