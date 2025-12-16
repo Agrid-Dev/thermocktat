@@ -2,45 +2,44 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/Agrid-Dev/thermocktat/cmd/app"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
 func main() {
-	addr := getenv("THERMOCKSTAT_HTTP_ADDR", ":8080")
+	var configPath string
+	flag.StringVar(&configPath, "config", "config.yaml", "path to config file (.yaml/.yml/.json)")
+	flag.Parse()
 
-	th, err := thermostat.New(thermostat.Snapshot{
-		Enabled:                true,
-		TemperatureSetpoint:    22,
-		TemperatureSetpointMin: 16,
-		TemperatureSetpointMax: 28,
-		Mode:                   thermostat.ModeAuto,
-		FanSpeed:               thermostat.FanAuto,
-		AmbientTemperature:     21,
-	})
+	cfg, err := app.LoadConfig(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	srv := httpctrl.New(th, addr)
+	snap, err := cfg.Snapshot()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	th, err := thermostat.New(snap)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srv := httpctrl.New(th, cfg.HTTP.Addr)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	log.Printf("thermockstat listening on %s", addr)
+	log.Printf("thermockstat listening on %s", cfg.HTTP.Addr)
 	if err := srv.Run(ctx); err != nil && err != context.Canceled {
 		log.Printf("server exited: %v", err)
 	}
-}
-
-func getenv(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
 }

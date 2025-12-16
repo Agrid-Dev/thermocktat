@@ -1,0 +1,12 @@
+http:
+  addr: ":8080"
+
+thermostat:
+  enabled: true
+  ambient_temperature: 21.0
+  temperature_setpoint: 22.0
+  temperature_setpoint_min: 16.0
+  temperature_setpoint_max: 28.0
+  mode: "auto"
+  fan_speed: "auto"
+
