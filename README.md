@@ -14,51 +14,15 @@ A lightweight thermostat emulator, primarily designed for BMS software testing (
 | min_setpoint       | float   | 16.0      | `setpoint` lower bound.    |
 | max_setpoint       | float   | 28.0      | `setpoint` upper bound.   |
 
-## API
 
-Currently has only an `http` api. More control protocols to come.
 
-`GET /v1`
+## API Documentation
+- [HTTP Controller API](internal/controllers/http/README.md)
+- [MQTT Controller API](internal/controllers/mqtt/README.md)
+- [Modbus Controller API](internal/controllers/modbus/README.md) (Coming soon)
+- [BACnet Controller API](internal/controllers/bacnet/README.md) (Coming soon)
 
-- Description: Retrieve the current attributes of the thermostat.
-- Method: GET
-- Example Request: `GET /v1`
 
-`POST /v1/:attribute`
-
-- Description: Update a specific attribute of the thermostat.
-- Method: POST
-- Request Body: JSON object with the format `{"value": <value>}`
-- Example Request: `POST /v1/enabled {"value": true}`
-
-`GET /healthz`
-
-Returns "ok" if server is running.
-
-### Examples
-- Enable the thermostat:
-  ```
-  POST /v1/enabled
-  {
-    "value": true
-  }
-  ```
-
-- Set the temperature setpoint:
-  ```
-  POST /v1/setpoint
-  {
-    "value": 21
-  }
-  ```
-
-- Change the operating mode:
-  ```
-  POST /v1/mode
-  {
-    "value": "heat"
-  }
-  ```
 
 ## Configuration
 
@@ -76,4 +40,11 @@ Can also run with environment variables (which have priority over config) :
 THERMOCKSTAT_HTTP_ADDR=:3001 go run ./cmd/thermocktat
 # or
 PORT=3001 go run ./cmd/thermocktat
+```
+
+## Docker Examples
+
+```sh
+docker run -p 8080:8080 thermocktat
+docker run -v $(pwd)/config.yaml:/config.yaml -p 8080:8080 thermocktat -config /config.yaml
 ```
