@@ -1,6 +1,14 @@
 device_id: "my-thermocktat"
-http:
-  addr: ":8080"
+controllers:
+  http:
+    enabled: true
+    addr: ":8080"
+  mqtt:
+    enabled: true
+    broker_url: "tcp://localhost:1883"
+    qos: 0
+    retain_snapshot: true
+    publish_interval: 1s
 
 thermostat:
   enabled: true

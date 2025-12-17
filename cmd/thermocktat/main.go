@@ -10,6 +10,7 @@ import (
 
 	"github.com/Agrid-Dev/thermocktat/cmd/app"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
+	mqttctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/mqtt"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
@@ -23,6 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 	app.ApplyEnvOverrides(&cfg)
+
 	snap, err := cfg.Snapshot()
 	if err != nil {
 		log.Fatal(err)
@@ -32,15 +34,49 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	deviceID := cfg.DeviceID // or env var, see below
-
-	srv := httpctrl.New(th, cfg.HTTP.Addr, deviceID)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	log.Printf("thermockstat listening on %s", cfg.HTTP.Addr)
-	if err := srv.Run(ctx); err != nil && err != context.Canceled {
-		log.Printf("server exited: %v", err)
+	deviceID := cfg.DeviceID
+
+	// Start enabled controllers
+	if cfg.Controllers.HTTP.Enabled {
+		srv := httpctrl.New(th, cfg.Controllers.HTTP.Addr, deviceID)
+		go func() {
+			log.Printf("http controller listening on %s", cfg.Controllers.HTTP.Addr)
+			if err := srv.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("http controller exited: %v", err)
+				cancel()
+			}
+		}()
 	}
+
+	if cfg.Controllers.MQTT.Enabled {
+		mc, err := mqttctrl.New(th, mqttctrl.Config{
+			DeviceID:        deviceID,
+			BrokerURL:       cfg.Controllers.MQTT.BrokerURL,
+			ClientID:        cfg.Controllers.MQTT.ClientID,
+			BaseTopic:       cfg.Controllers.MQTT.BaseTopic,
+			QoS:             cfg.Controllers.MQTT.QoS,
+			RetainSnapshot:  cfg.Controllers.MQTT.RetainSnapshot,
+			PublishInterval: cfg.Controllers.MQTT.PublishInterval,
+			Username:        cfg.Controllers.MQTT.Username,
+			Password:        cfg.Controllers.MQTT.Password,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go func() {
+			log.Printf("mqtt controller broker=%s base_topic=%s", cfg.Controllers.MQTT.BrokerURL, cfg.Controllers.MQTT.BaseTopic)
+			if err := mc.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("mqtt controller exited: %v", err)
+				cancel()
+			}
+		}()
+	}
+
+	// Block until shutdown.
+	<-ctx.Done()
 }

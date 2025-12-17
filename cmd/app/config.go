@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -13,10 +14,11 @@ import (
 )
 
 type Config struct {
-	DeviceID string `json:"device_id" yaml:"device_id"`
-	HTTP     struct {
-		Addr string `json:"addr" yaml:"addr"`
-	} `json:"http" yaml:"http"`
+	DeviceID    string `json:"device_id" yaml:"device_id"`
+	Controllers struct {
+		HTTP HTTPConfig `json:"http" yaml:"http"`
+		MQTT MQTTConfig `json:"mqtt" yaml:"mqtt"`
+	} `json:"controllers" yaml:"controllers"`
 
 	Thermostat ThermostatConfig `json:"thermostat" yaml:"thermostat"`
 }
@@ -31,6 +33,23 @@ type ThermostatConfig struct {
 
 	Mode     *string `json:"mode" yaml:"mode"`           // "heat" | "cool" | "fan" | "auto"
 	FanSpeed *string `json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
+}
+
+type HTTPConfig struct {
+	Enabled bool   `json:"enabled" yaml:"enabled"`
+	Addr    string `json:"addr" yaml:"addr"`
+}
+
+type MQTTConfig struct {
+	Enabled         bool          `json:"enabled" yaml:"enabled"`
+	BrokerURL       string        `json:"broker_url" yaml:"broker_url"`
+	ClientID        string        `json:"client_id" yaml:"client_id"`
+	BaseTopic       string        `json:"base_topic" yaml:"base_topic"`
+	QoS             byte          `json:"qos" yaml:"qos"`
+	RetainSnapshot  bool          `json:"retain_snapshot" yaml:"retain_snapshot"`
+	PublishInterval time.Duration `json:"publish_interval" yaml:"publish_interval"`
+	Username        string        `json:"username" yaml:"username"`
+	Password        string        `json:"password" yaml:"password"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -70,11 +89,17 @@ func LoadConfig(path string) (Config, error) {
 }
 
 func applyDefaults(cfg *Config) {
-	if cfg.HTTP.Addr == "" {
-		cfg.HTTP.Addr = ":8080"
-	}
 	if cfg.DeviceID == "" {
 		cfg.DeviceID = "default"
+	}
+	if cfg.Controllers.HTTP.Addr == "" {
+		cfg.Controllers.HTTP.Addr = ":8080"
+	}
+	if !cfg.Controllers.HTTP.Enabled && !cfg.Controllers.MQTT.Enabled {
+		cfg.Controllers.HTTP.Enabled = true
+	}
+	if cfg.Controllers.MQTT.PublishInterval == 0 {
+		cfg.Controllers.MQTT.PublishInterval = 1 * time.Second
 	}
 }
 
@@ -134,12 +159,12 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 func ApplyEnvOverrides(cfg *Config) {
 	// Explicit addr prefered, else support PORT (common in containers).
 	if v := os.Getenv("THERMOCKSTAT_HTTP_ADDR"); v != "" {
-		cfg.HTTP.Addr = v
+		cfg.Controllers.HTTP.Addr = v
 		return
 	}
 	if v := os.Getenv("PORT"); v != "" {
 		// listen on all interfaces on that port
-		cfg.HTTP.Addr = ":" + v
+		cfg.Controllers.HTTP.Addr = ":" + v
 		return
 	}
 	if v := os.Getenv("THERMOCKTAT_DEVICE_ID"); v != "" {

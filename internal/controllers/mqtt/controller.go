@@ -137,7 +137,7 @@ func (c *Controller) publishSnapshot() {
 		FanSpeed:               s.FanSpeed.String(),
 		AmbientTemperature:     s.AmbientTemperature,
 	}
-	b, _ := json.Marshal(dto) // safe: dto has no unsupported types
+	b, _ := json.Marshal(dto)
 	c.client.Publish(c.topic("snapshot"), c.cfg.QoS, c.cfg.RetainSnapshot, b)
 }
 
@@ -227,12 +227,10 @@ func (c *Controller) topic(suffix string) string {
 	return strings.TrimRight(c.cfg.BaseTopic, "/") + "/" + suffix
 }
 
-// Strict JSON decode with unknown-field rejection + required "value".
 func decodeValueStrict[T any](b []byte) (T, error) {
 	var zero T
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
-
 	var req valueReq[T]
 	if err := dec.Decode(&req); err != nil {
 		return zero, err
