@@ -185,7 +185,8 @@ func TestOnMessage_IgnoresWrongPrefix(t *testing.T) {
 func TestOnMessage_Enabled(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
-
+	fc := &fakeClient{}
+	c.client = fc
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/enabled",
 		payload: []byte(`{"value":false}`),
@@ -199,6 +200,8 @@ func TestOnMessage_Enabled(t *testing.T) {
 func TestOnMessage_Setpoint(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
+	fc := &fakeClient{}
+	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/setpoint",
@@ -216,6 +219,8 @@ func TestOnMessage_MinMax(t *testing.T) {
 	svc.S.TemperatureSetpointMax = 30
 
 	c, _ := New(svc, Config{DeviceID: "room101"})
+	fc := &fakeClient{}
+	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/min_setpoint",
@@ -234,7 +239,8 @@ func TestOnMessage_MaxMin(t *testing.T) {
 	svc.S.TemperatureSetpointMax = 30
 
 	c, _ := New(svc, Config{DeviceID: "room101"})
-
+	fc := &fakeClient{}
+	c.client = fc
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/max_setpoint",
 		payload: []byte(`{"value":28}`),
@@ -249,7 +255,8 @@ func TestOnMessage_MaxMin(t *testing.T) {
 func TestOnMessage_Mode(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
-
+	fc := &fakeClient{}
+	c.client = fc
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/mode",
 		payload: []byte(`{"value":"heat"}`),
@@ -263,6 +270,8 @@ func TestOnMessage_Mode(t *testing.T) {
 func TestOnMessage_ModeInvalid_DoesNotCallService(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
+	fc := &fakeClient{}
+	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/mode",
@@ -277,7 +286,8 @@ func TestOnMessage_ModeInvalid_DoesNotCallService(t *testing.T) {
 func TestOnMessage_FanSpeed(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
-
+	fc := &fakeClient{}
+	c.client = fc
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/fan_speed",
 		payload: []byte(`{"value":"high"}`),
@@ -291,6 +301,8 @@ func TestOnMessage_FanSpeed(t *testing.T) {
 func TestOnMessage_FanSpeedInvalid_DoesNotCallService(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
+	fc := &fakeClient{}
+	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/fan_speed",
@@ -340,7 +352,8 @@ func TestOnMessage_ServiceError_IsIgnored(t *testing.T) {
 	svc := newDefaultSvc()
 	svc.SetSetpointErr = errors.New("boom")
 	c, _ := New(svc, Config{DeviceID: "room101"})
-
+	fc := &fakeClient{}
+	c.client = fc
 	c.onMessage(nil, fakeMessage{
 		topic:   "thermocktat/room101/set/setpoint",
 		payload: []byte(`{"value":25}`),

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -43,12 +44,9 @@ type Controller struct {
 }
 
 func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
-	// ---- defaults ----
-
 	if cfg.BrokerURL == "" {
 		cfg.BrokerURL = "tcp://localhost:1883"
 	}
-
 	if cfg.DeviceID == "" {
 		return nil, errors.New("mqtt: DeviceID is required")
 	}
@@ -85,11 +83,14 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	// Subscribe when connected/reconnected.
 	opts.OnConnect = func(cl mqtt.Client) {
-		// Subscribe to all set commands under BaseTopic.
-		topic := c.topic("set/+")
-		token := cl.Subscribe(topic, c.cfg.QoS, c.onMessage)
-		token.Wait()
-		// If subscribe fails, paho exposes token.Error().
+		log.Printf("Connected to MQTT broker with base topic: %s", c.cfg.BaseTopic)
+		topicSet := c.topic("set/+")
+		tokenSet := cl.Subscribe(topicSet, c.cfg.QoS, c.onMessage)
+		tokenSet.Wait()
+
+		topicGet := c.topic("get/+")
+		tokenGet := cl.Subscribe(topicGet, c.cfg.QoS, c.onMessage)
+		tokenGet.Wait()
 	}
 
 	c.client = mqtt.NewClient(opts)
@@ -159,6 +160,7 @@ type valueReq[T any] struct {
 func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 	// topic format: <base>/set/<field>
 	t := msg.Topic()
+	log.Printf("Received message on topic: %s", msg.Topic())
 	// Request: <base>/get/<what>
 	if what, ok := strings.CutPrefix(t, c.cfg.BaseTopic+"/get/"); ok {
 		switch what {
@@ -226,6 +228,7 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 			}
 			_ = c.svc.SetFanSpeed(f)
 		}
+		c.publishSnapshot()
 	}
 }
 

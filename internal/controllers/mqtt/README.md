@@ -10,7 +10,7 @@ controllers:
     addr: ":8080"
   mqtt:
     enabled: true
-    broker_url: "tcp://localhost:1883"
+    broker_url: "tcp://localhost:1883" # or "tcp://host.docker.internal:1883"
     qos: 0
     retain_snapshot: true
     publish_interval: 1s # will publish snapshot every interval (only if changed)

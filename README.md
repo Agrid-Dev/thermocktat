@@ -43,7 +43,8 @@ PORT=3001 go run ./cmd/thermocktat
 ```
 
 ## Docker Examples
-### HTTP Controller
+
 ```sh
 docker run -p 8080:8080 thermocktat
+docker run -v $(pwd)/config.yaml:/config.yaml -p 8080:8080 thermocktat -config /config.yaml
 ```
