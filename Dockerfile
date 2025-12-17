@@ -11,12 +11,24 @@ RUN go mod download
 # Build
 COPY . .
 
+
+# BuildKit provides these automatically.
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+RUN echo "Building for TARGETPLATFORM=${TARGETPLATFORM:-$BUILDPLATFORM} (TARGETOS=$TARGETOS TARGETARCH=$TARGETARCH)"
+
 # Build metadata (optional)
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG DATE=unknown
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN set -eu; \
+    os="${TARGETOS:-$(echo ${BUILDPLATFORM:-linux/amd64} | cut -d/ -f1)}"; \
+    arch="${TARGETARCH:-$(echo ${BUILDPLATFORM:-linux/amd64} | cut -d/ -f2)}"; \
+    CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
     go build -trimpath -ldflags "-s -w \
     -X github.com/Agrid-Dev/thermocktat/internal/buildinfo.Version=${VERSION} \
     -X github.com/Agrid-Dev/thermocktat/internal/buildinfo.Commit=${COMMIT} \
