@@ -7,28 +7,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
-// Service is what the controller depends on (thermostat implements it).
-type Service interface {
-	Get() thermostat.Snapshot
-	SetEnabled(bool)
-	SetSetpoint(float64) error
-	SetMinMax(min, max float64) error
-	SetMode(thermostat.Mode) error
-	SetFanSpeed(thermostat.FanSpeed) error
-}
-
 type Server struct {
-	svc Service
-	srv *http.Server
+	svc      ports.ThermostatService
+	srv      *http.Server
+	deviceID string
 }
 
 // New returns a runnable server.
-func New(svc Service, addr string) *Server {
+func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
 	mux := http.NewServeMux()
-	s := &Server{svc: svc}
+	s := &Server{svc: svc, deviceID: deviceID}
 
 	// Read
 	mux.HandleFunc("GET /v1", s.handleGet)
@@ -79,12 +71,13 @@ func (s *Server) Run(ctx context.Context) error {
 // ---- DTOs ----
 
 type snapshotDTO struct {
+	DeviceID               string  `json:"device_id"`
 	Enabled                bool    `json:"enabled"`
 	TemperatureSetpoint    float64 `json:"temperature_setpoint"`
 	TemperatureSetpointMin float64 `json:"temperature_setpoint_min"`
 	TemperatureSetpointMax float64 `json:"temperature_setpoint_max"`
-	Mode                   string  `json:"mode"`      // stringified
-	FanSpeed               string  `json:"fan_speed"` // stringified
+	Mode                   string  `json:"mode"`
+	FanSpeed               string  `json:"fan_speed"`
 	AmbientTemperature     float64 `json:"ambient_temperature"`
 }
 
@@ -157,7 +150,9 @@ func (s *Server) handlePostFanSpeed(w http.ResponseWriter, r *http.Request) {
 
 // ---- generic helpers ----
 func (s *Server) respondSnapshot(w http.ResponseWriter) {
-	writeJSON(w, http.StatusOK, toDTO(s.svc.Get()))
+	dto := toDTO(s.svc.Get())
+	dto.DeviceID = s.deviceID
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func postValue[T any](s *Server, w http.ResponseWriter, r *http.Request, apply func(T) error) {

@@ -1,3 +1,4 @@
+device_id: "my-thermocktat"
 http:
   addr: ":8080"
 
@@ -9,4 +10,3 @@ thermostat:
   temperature_setpoint_max: 28.0
   mode: "auto"
   fan_speed: "auto"
-

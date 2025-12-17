@@ -32,8 +32,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	deviceID := cfg.DeviceID // or env var, see below
 
-	srv := httpctrl.New(th, cfg.HTTP.Addr)
+	srv := httpctrl.New(th, cfg.HTTP.Addr, deviceID)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()

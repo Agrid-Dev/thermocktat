@@ -13,7 +13,8 @@ import (
 )
 
 type Config struct {
-	HTTP struct {
+	DeviceID string `json:"device_id" yaml:"device_id"`
+	HTTP     struct {
 		Addr string `json:"addr" yaml:"addr"`
 	} `json:"http" yaml:"http"`
 
@@ -71,6 +72,9 @@ func LoadConfig(path string) (Config, error) {
 func applyDefaults(cfg *Config) {
 	if cfg.HTTP.Addr == "" {
 		cfg.HTTP.Addr = ":8080"
+	}
+	if cfg.DeviceID == "" {
+		cfg.DeviceID = "default"
 	}
 }
 
@@ -137,5 +141,8 @@ func ApplyEnvOverrides(cfg *Config) {
 		// listen on all interfaces on that port
 		cfg.HTTP.Addr = ":" + v
 		return
+	}
+	if v := os.Getenv("THERMOCKTAT_DEVICE_ID"); v != "" {
+		cfg.DeviceID = v
 	}
 }

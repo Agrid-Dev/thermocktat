@@ -214,7 +214,8 @@ func newFakeSvc() *fakeSvc {
 
 func newTestServer() (*Server, *fakeSvc) {
 	f := newFakeSvc()
-	return New(f, ":0"), f
+	DeviceId := "default"
+	return New(f, ":0", DeviceId), f
 }
 
 func doJSONRequest(t *testing.T, h http.Handler, method, path string, body any) *httptest.ResponseRecorder {
