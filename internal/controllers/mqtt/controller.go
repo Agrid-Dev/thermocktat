@@ -159,67 +159,73 @@ type valueReq[T any] struct {
 func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 	// topic format: <base>/set/<field>
 	t := msg.Topic()
-	prefix := c.cfg.BaseTopic + "/set/"
-	if !strings.HasPrefix(t, prefix) {
+	// Request: <base>/get/<what>
+	if what, ok := strings.CutPrefix(t, c.cfg.BaseTopic+"/get/"); ok {
+		switch what {
+		case "snapshot":
+			c.publishSnapshot()
+		}
 		return
 	}
-	field := strings.TrimPrefix(t, prefix)
 
-	payload := msg.Payload()
+	// Command: <base>/set/<field>
+	if field, ok := strings.CutPrefix(t, c.cfg.BaseTopic+"/set/"); ok {
+		payload := msg.Payload()
 
-	// Dispatch by field
-	switch field {
-	case "enabled":
-		v, err := decodeValueStrict[bool](payload)
-		if err != nil {
-			return
-		}
-		c.svc.SetEnabled(v)
+		// Dispatch by field
+		switch field {
+		case "enabled":
+			v, err := decodeValueStrict[bool](payload)
+			if err != nil {
+				return
+			}
+			c.svc.SetEnabled(v)
 
-	case "setpoint":
-		v, err := decodeValueStrict[float64](payload)
-		if err != nil {
-			return
-		}
-		_ = c.svc.SetSetpoint(v)
+		case "setpoint":
+			v, err := decodeValueStrict[float64](payload)
+			if err != nil {
+				return
+			}
+			_ = c.svc.SetSetpoint(v)
 
-	case "min_setpoint":
-		v, err := decodeValueStrict[float64](payload)
-		if err != nil {
-			return
-		}
-		cur := c.svc.Get()
-		_ = c.svc.SetMinMax(v, cur.TemperatureSetpointMax)
+		case "min_setpoint":
+			v, err := decodeValueStrict[float64](payload)
+			if err != nil {
+				return
+			}
+			cur := c.svc.Get()
+			_ = c.svc.SetMinMax(v, cur.TemperatureSetpointMax)
 
-	case "max_setpoint":
-		v, err := decodeValueStrict[float64](payload)
-		if err != nil {
-			return
-		}
-		cur := c.svc.Get()
-		_ = c.svc.SetMinMax(cur.TemperatureSetpointMin, v)
+		case "max_setpoint":
+			v, err := decodeValueStrict[float64](payload)
+			if err != nil {
+				return
+			}
+			cur := c.svc.Get()
+			_ = c.svc.SetMinMax(cur.TemperatureSetpointMin, v)
 
-	case "mode":
-		s, err := decodeValueStrict[string](payload)
-		if err != nil {
-			return
-		}
-		m, err := thermostat.ParseMode(s)
-		if err != nil {
-			return
-		}
-		_ = c.svc.SetMode(m)
+		case "mode":
+			s, err := decodeValueStrict[string](payload)
+			if err != nil {
+				return
+			}
+			m, err := thermostat.ParseMode(s)
+			if err != nil {
+				return
+			}
+			_ = c.svc.SetMode(m)
 
-	case "fan_speed":
-		s, err := decodeValueStrict[string](payload)
-		if err != nil {
-			return
+		case "fan_speed":
+			s, err := decodeValueStrict[string](payload)
+			if err != nil {
+				return
+			}
+			f, err := thermostat.ParseFanSpeed(s)
+			if err != nil {
+				return
+			}
+			_ = c.svc.SetFanSpeed(f)
 		}
-		f, err := thermostat.ParseFanSpeed(s)
-		if err != nil {
-			return
-		}
-		_ = c.svc.SetFanSpeed(f)
 	}
 }
 
