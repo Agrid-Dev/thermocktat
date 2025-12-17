@@ -31,14 +31,19 @@ jobs:
         id: meta
         run: echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Normalize image owner (lowercase)
+        id: owner
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/thermocktat:${{ steps.meta.outputs.TAG }}
-            ghcr.io/${{ github.repository_owner }}/thermocktat:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/thermocktat:${{ steps.meta.outputs.TAG }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/thermocktat:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
