@@ -7,12 +7,12 @@ A lightweight thermostat emulator, primarily designed for BMS software testing (
 | Name           | Type    | Default   | Comment                                      |
 |----------------|---------|-----------|----------------------------------------------|
 | ambient_temperature    | float   | 21.0      | Current temperature reading.      |
-| setpoint       | float   | 22.0      | Target temperature. Must be between `min_setpoint` and `max_setpoint`.        |
-| mode           | string  | "auto"    | Operating mode: "auto", "heat", "cool", "fan". |
-| fan_speed      | string  | "medium"  | Fan speed setting: "auto", "low", "medium", or "high".  |
+| setpoint_temperature  | float   | 22.0      | Target temperature. Must be between `setpoint_temperature_min` and `setpoint_temperature_max`. |
+| mode           | string  | "auto"    | Operating mode: `auto \| heat \| cool \| fan`. |
+| fan_speed      | string  | "medium"  | Fan speed setting: `auto \| low \| medium \| high`.  |
 | enabled          | boolean | true      | Indicates if the thermostat is powered (on/off).   |
-| min_setpoint       | float   | 16.0      | `setpoint` lower bound.    |
-| max_setpoint       | float   | 28.0      | `setpoint` upper bound.   |
+| setpoint_temperature_min  | float   | 16.0      | `setpoint` lower bound.    |
+| setpoint_temperature_max  | float   | 28.0      | `setpoint` upper bound.   |
 
 
 
