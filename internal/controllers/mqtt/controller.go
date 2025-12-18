@@ -183,14 +183,14 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 			}
 			c.svc.SetEnabled(v)
 
-		case "setpoint":
+		case "temperature_setpoint":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
 				return
 			}
 			_ = c.svc.SetSetpoint(v)
 
-		case "min_setpoint":
+		case "temperature_setpoint_min":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
 				return
@@ -198,7 +198,7 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 			cur := c.svc.Get()
 			_ = c.svc.SetMinMax(v, cur.TemperatureSetpointMax)
 
-		case "max_setpoint":
+		case "temperature_setpoint_max":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
 				return

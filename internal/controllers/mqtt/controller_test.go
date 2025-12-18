@@ -204,7 +204,7 @@ func TestOnMessage_Setpoint(t *testing.T) {
 	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
-		topic:   "thermocktat/room101/set/setpoint",
+		topic:   "thermocktat/room101/set/temperature_setpoint",
 		payload: []byte(`{"value":23.5}`),
 	})
 
@@ -223,7 +223,7 @@ func TestOnMessage_MinMax(t *testing.T) {
 	c.client = fc
 
 	c.onMessage(nil, fakeMessage{
-		topic:   "thermocktat/room101/set/min_setpoint",
+		topic:   "thermocktat/room101/set/temperature_setpoint_min",
 		payload: []byte(`{"value":12}`),
 	})
 
@@ -242,7 +242,7 @@ func TestOnMessage_MaxMin(t *testing.T) {
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
-		topic:   "thermocktat/room101/set/max_setpoint",
+		topic:   "thermocktat/room101/set/temperature_setpoint_max",
 		payload: []byte(`{"value":28}`),
 	})
 
@@ -355,7 +355,7 @@ func TestOnMessage_ServiceError_IsIgnored(t *testing.T) {
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
-		topic:   "thermocktat/room101/set/setpoint",
+		topic:   "thermocktat/room101/set/temperature_setpoint",
 		payload: []byte(`{"value":25}`),
 	})
 

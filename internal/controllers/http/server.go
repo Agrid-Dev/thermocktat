@@ -27,9 +27,9 @@ func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
 
 	// Write: one endpoint per variable
 	mux.HandleFunc("POST /v1/enabled", s.handlePostEnabled)
-	mux.HandleFunc("POST /v1/setpoint", s.handlePostSetpoint)
-	mux.HandleFunc("POST /v1/min_setpoint", s.handlePostMinSetpoint)
-	mux.HandleFunc("POST /v1/max_setpoint", s.handlePostMaxSetpoint)
+	mux.HandleFunc("POST /v1/temperature_setpoint", s.handlePostSetpoint)
+	mux.HandleFunc("POST /v1/temperature_setpoint_min", s.handlePostMinSetpoint)
+	mux.HandleFunc("POST /v1/temperature_setpoint_max", s.handlePostMaxSetpoint)
 	mux.HandleFunc("POST /v1/mode", s.handlePostMode)
 	mux.HandleFunc("POST /v1/fan_speed", s.handlePostFanSpeed)
 
