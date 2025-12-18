@@ -58,9 +58,9 @@ Publish a message to topic `{base_topic}/get/snapshot` to trigger a snapshot pub
 | Attribute | Type | Example |
 |---------|------|--------|
 | `enabled` | bool | `true` |
-| `setpoint` | number | `22.5` |
-| `min_setpoint` | number | `16` |
-| `max_setpoint` | number | `28` |
+| `temperature_setpoint` | number | `22.5` |
+| `temperature_setpoint_min` | number | `16` |
+| `maxtemperature_setpoint_max` | number | `28` |
 | `mode` | string | `"heat"` |
 | `fan_speed` | string | `"high"` |
 
@@ -77,7 +77,7 @@ Assuming the broker is running on localhost:1883, and using `mosquitto_pub` :
 
 ```sh
 mosquitto_pub -h localhost -p 1883 -t "thermocktat/my-thermocktat/set/enabled" -m '{"value":true}'
-mosquitto_pub -h localhost -p 1883 -t "thermocktat/my-thermocktat/set/setpoint" -m '{"value":24}'
+mosquitto_pub -h localhost -p 1883 -t "thermocktat/my-thermocktat/set/temperature_setpoint" -m '{"value":24}'
 mosquitto_pub -h localhost -p 1883 -t "thermocktat/my-thermocktat/set/mode" -m '{"value":"heat"}'
 ```
 

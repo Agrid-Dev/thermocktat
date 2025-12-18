@@ -67,7 +67,7 @@ func TestPOST_setpoint_ErrorFromService(t *testing.T) {
 	srv, f := newTestServer()
 	f.SetSetpointErr = thermostat.ErrSetpointOutOfRange
 
-	rr := doJSONRequest(t, srv.srv.Handler, http.MethodPost, "/v1/setpoint", map[string]any{
+	rr := doJSONRequest(t, srv.srv.Handler, http.MethodPost, "/v1/temperature_setpoint", map[string]any{
 		"value": 999,
 	})
 	assertStatus(t, rr, http.StatusBadRequest)
@@ -100,7 +100,7 @@ func TestPOST_min_setpoint(t *testing.T) {
 	srv, f := newTestServer()
 
 	// Test successful min setpoint update
-	rr := postValueEndpoint(t, srv, "/v1/min_setpoint", 18.0)
+	rr := postValueEndpoint(t, srv, "/v1/temperature_setpoint_min", 18.0)
 	assertStatus(t, rr, http.StatusOK)
 
 	if f.S.TemperatureSetpointMin != 18.0 {
@@ -109,7 +109,7 @@ func TestPOST_min_setpoint(t *testing.T) {
 
 	// Test invalid min setpoint (greater than current max)
 	f.SetMinMaxErr = thermostat.ErrInvalidMinMax
-	rr = postValueEndpoint(t, srv, "/v1/min_setpoint", 30.0)
+	rr = postValueEndpoint(t, srv, "/v1/temperature_setpoint_min", 30.0)
 	assertStatus(t, rr, http.StatusBadRequest)
 	_ = assertErrorResponse(t, rr)
 }
@@ -118,7 +118,7 @@ func TestPOST_max_setpoint(t *testing.T) {
 	srv, f := newTestServer()
 
 	// Test successful max setpoint update
-	rr := postValueEndpoint(t, srv, "/v1/max_setpoint", 26.0)
+	rr := postValueEndpoint(t, srv, "/v1/temperature_setpoint_max", 26.0)
 	assertStatus(t, rr, http.StatusOK)
 
 	if f.S.TemperatureSetpointMax != 26.0 {
@@ -127,7 +127,7 @@ func TestPOST_max_setpoint(t *testing.T) {
 
 	// Test invalid max setpoint (less than current min)
 	f.SetMinMaxErr = thermostat.ErrInvalidMinMax
-	rr = postValueEndpoint(t, srv, "/v1/max_setpoint", 15.0)
+	rr = postValueEndpoint(t, srv, "/v1/temperature_setpoint_max", 15.0)
 	assertStatus(t, rr, http.StatusBadRequest)
 	_ = assertErrorResponse(t, rr)
 }
