@@ -2,6 +2,11 @@
 
 A lightweight thermostat emulator, primarily designed for BMS software testing (Building Management Systems).
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/60c5e587-035c-4f38-b396-9695343a1a75" alt="A cool dino just for fun"/>
+</p>
+
+
 ## Attributes
 
 | Name           | Type    | Default   | Comment                                      |
