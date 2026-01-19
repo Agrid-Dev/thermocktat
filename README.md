@@ -24,7 +24,7 @@ A lightweight thermostat emulator, primarily designed for BMS software testing (
 ## API Documentation
 - [HTTP Controller API](internal/controllers/http/README.md)
 - [MQTT Controller API](internal/controllers/mqtt/README.md)
-- [Modbus Controller API](internal/controllers/modbus/README.md) (Coming soon)
+- [Modbus Controller API](internal/controllers/modbus/README.md)
 - [BACnet Controller API](internal/controllers/bacnet/README.md) (Coming soon)
 
 

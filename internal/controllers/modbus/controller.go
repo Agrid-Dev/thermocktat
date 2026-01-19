@@ -19,8 +19,7 @@ type Config struct {
 	DeviceID string
 	Addr     string
 	UnitID   byte // UnitID (Modbus slave/unit ID). Use an integer 1..247.
-	// How frequently to copy the thermostat snapshot into mbserver memory for reads.
-	// If your service never changes except via Modbus, you can set this to 0 to disable.
+	// SyncInterval retained in config to preserve API but unused when reads are handled by custom handlers.
 	SyncInterval time.Duration
 }
 
@@ -38,21 +37,113 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:1502"
 	}
-	if cfg.SyncInterval == 0 {
-		cfg.SyncInterval = 1 * time.Second
-	}
+	// SyncInterval is optional; no polling is required because reads are handled directly.
 	return &Controller{svc: svc, cfg: cfg}, nil
 }
 
-// Run starts the Modbus server and registers handlers that apply writes immediately.
-// It blocks until ctx is canceled.
+// Run starts the Modbus server and registers handlers that apply writes immediately and
+// provide reads directly from the thermostat service. It blocks until ctx is canceled.
 func (c *Controller) Run(ctx context.Context) error {
 	serv := mbserver.NewServer()
 	c.serv = serv
 
-	if err := serv.ListenTCP(c.cfg.Addr); err != nil {
-		return fmt.Errorf("mbserver listen tcp %s: %w", c.cfg.Addr, err)
-	}
+	// Register handlers BEFORE starting the TCP listener to avoid races inside mbserver
+	// between handler registration and the server's goroutines.
+	// Read Coils (function 1) - return current enabled state.
+	serv.RegisterFunctionHandler(1, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
+		data := frame.GetData()
+		if len(data) < 4 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		start := binary.BigEndian.Uint16(data[0:2])
+		qty := binary.BigEndian.Uint16(data[2:4])
+		if qty == 0 || qty > 2000 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		// We only expose coil 0 (enabled)
+		if start != 0 || qty != 1 {
+			return []byte{}, &mbserver.IllegalDataAddress
+		}
+		snap := c.svc.Get()
+		coilByte := byte(0)
+		if snap.Enabled {
+			coilByte = 0x01
+		}
+		// response: byte count (1) + coil bytes
+		return []byte{1, coilByte}, &mbserver.Success
+	})
+
+	// Read Holding Registers (function 3) - expose HR 0..4 from service snapshot.
+	serv.RegisterFunctionHandler(3, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
+		data := frame.GetData()
+		if len(data) < 4 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		start := int(binary.BigEndian.Uint16(data[0:2]))
+		qty := int(binary.BigEndian.Uint16(data[2:4]))
+		if qty == 0 || qty > 125 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		// We support addresses 0..4
+		if start < 0 || start+qty > 5 {
+			return []byte{}, &mbserver.IllegalDataAddress
+		}
+		snap := c.svc.Get()
+		// Build response: byte count + register bytes
+		regs := make([]uint16, 0, qty)
+		for i := 0; i < qty; i++ {
+			addr := start + i
+			switch addr {
+			case 0:
+				regs = append(regs, encodeTemp(snap.TemperatureSetpoint))
+			case 1:
+				regs = append(regs, encodeTemp(snap.TemperatureSetpointMin))
+			case 2:
+				regs = append(regs, encodeTemp(snap.TemperatureSetpointMax))
+			case 3:
+				regs = append(regs, uint16(snap.Mode))
+			case 4:
+				regs = append(regs, uint16(snap.FanSpeed))
+			default:
+				return []byte{}, &mbserver.IllegalDataAddress
+			}
+		}
+		byteCount := len(regs) * 2
+		resp := make([]byte, 1+byteCount)
+		resp[0] = byte(byteCount)
+		for i, r := range regs {
+			binary.BigEndian.PutUint16(resp[1+i*2:1+i*2+2], r)
+		}
+		return resp, &mbserver.Success
+	})
+
+	// Read Input Registers (function 4) - expose IR 0 (ambient temperature).
+	serv.RegisterFunctionHandler(4, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
+		data := frame.GetData()
+		if len(data) < 4 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		start := int(binary.BigEndian.Uint16(data[0:2]))
+		qty := int(binary.BigEndian.Uint16(data[2:4]))
+		if qty == 0 || qty > 125 {
+			return []byte{}, &mbserver.IllegalDataValue
+		}
+		if start < 0 || start+qty > 1 {
+			return []byte{}, &mbserver.IllegalDataAddress
+		}
+		snap := c.svc.Get()
+		// Only IR 0 is present
+		if qty != 1 || start != 0 {
+			return []byte{}, &mbserver.IllegalDataAddress
+		}
+		val := encodeTemp(snap.AmbientTemperature)
+		resp := make([]byte, 1+2)
+		resp[0] = 2
+		binary.BigEndian.PutUint16(resp[1:3], val)
+		return resp, &mbserver.Success
+	})
+
+	// Write Single Coil (function 5) - enabled
 	serv.RegisterFunctionHandler(5, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
 		data := frame.GetData()
 		if len(data) < 4 {
@@ -61,7 +152,6 @@ func (c *Controller) Run(ctx context.Context) error {
 		addr := binary.BigEndian.Uint16(data[0:2])
 		value := binary.BigEndian.Uint16(data[2:4])
 
-		// Only accept coil 0 for enabled
 		if addr != 0 {
 			return []byte{}, &mbserver.IllegalDataAddress
 		}
@@ -76,11 +166,7 @@ func (c *Controller) Run(ctx context.Context) error {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
 
-		// Apply to service synchronously
 		c.svc.SetEnabled(enabled)
-
-		// Update server memory to reflect final service state (svc may have side-effects)
-		c.writeSnapshotToServer(c.svc.Get())
 
 		// echo request (address + value)
 		resp := make([]byte, 4)
@@ -88,7 +174,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		return resp, &mbserver.Success
 	})
 
-	// Write Single Holding Register (function 6)
+	// Write Single Register (function 6)
 	serv.RegisterFunctionHandler(6, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
 		data := frame.GetData()
 		if len(data) < 4 {
@@ -99,52 +185,39 @@ func (c *Controller) Run(ctx context.Context) error {
 
 		switch addr {
 		case 0:
-			// setpoint
-			v := decodeTemp(value)
-			if err := c.svc.SetSetpoint(v); err != nil {
+			if err := c.svc.SetSetpoint(decodeTemp(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
 		case 1:
-			// setpoint min
 			cur := c.svc.Get()
-			v := decodeTemp(value)
-			if err := c.svc.SetMinMax(v, cur.TemperatureSetpointMax); err != nil {
+			if err := c.svc.SetMinMax(decodeTemp(value), cur.TemperatureSetpointMax); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
 		case 2:
-			// setpoint max
 			cur := c.svc.Get()
-			v := decodeTemp(value)
-			if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, v); err != nil {
+			if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, decodeTemp(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
 		case 3:
-			// mode (enum)
-			m := thermostat.Mode(value)
-			if err := c.svc.SetMode(m); err != nil {
+			if err := c.svc.SetMode(thermostat.Mode(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
 		case 4:
-			// fan_speed
-			f := thermostat.FanSpeed(value)
-			if err := c.svc.SetFanSpeed(f); err != nil {
+			if err := c.svc.SetFanSpeed(thermostat.FanSpeed(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
 		default:
 			return []byte{}, &mbserver.IllegalDataAddress
 		}
 
-		// success: update server memory and echo the request
-		c.writeSnapshotToServer(c.svc.Get())
 		resp := make([]byte, 4)
 		copy(resp, data[0:4])
 		return resp, &mbserver.Success
 	})
 
-	// Write Multiple Registers (function 16) - support writing a block of HRs
+	// Write Multiple Registers (function 16)
 	serv.RegisterFunctionHandler(16, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
 		d := frame.GetData()
-		// data layout: start addr (2) | quantity (2) | bytecount (1) | bytes...
 		if len(d) < 5 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
@@ -154,7 +227,6 @@ func (c *Controller) Run(ctx context.Context) error {
 		if byteCount != int(quantity)*2 || len(d) < 5+byteCount {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
-		// iterate registers and apply
 		for i := 0; i < int(quantity); i++ {
 			addr := int(start) + i
 			val := binary.BigEndian.Uint16(d[5+i*2 : 5+i*2+2])
@@ -182,90 +254,25 @@ func (c *Controller) Run(ctx context.Context) error {
 					return []byte{}, &mbserver.IllegalDataValue
 				}
 			default:
-				// illegal address
 				return []byte{}, &mbserver.IllegalDataAddress
 			}
 		}
 
-		// success: update server memory
-		c.writeSnapshotToServer(c.svc.Get())
-
-		// Response for Write Multiple Registers is start + quantity
 		resp := make([]byte, 4)
 		binary.BigEndian.PutUint16(resp[0:2], start)
 		binary.BigEndian.PutUint16(resp[2:4], quantity)
 		return resp, &mbserver.Success
 	})
 
-	// Periodically copy service snapshot to server memory so read requests reflect latest state.
-	ticker := time.NewTicker(c.cfg.SyncInterval)
-	defer func() {
-		ticker.Stop()
-		serv.Close()
-	}()
-
-	// initial snapshot
-	c.writeSnapshotToServer(c.svc.Get())
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			c.writeSnapshotToServer(c.svc.Get())
-		}
-	}
-}
-
-// writeSnapshotToServer writes the thermostat snapshot into mbserver memory.
-func (c *Controller) writeSnapshotToServer(snap thermostat.Snapshot) {
-	s := c.serv
-	if s == nil {
-		return
-	}
-	// coils: coil 0 stored in byte 0 LSB bit 0; mbserver stores raw coil bytes.
-	if len(s.Coils) > 0 {
-		// not used here
-	}
-	// set coil 0 (enabled)
-	if len(s.Coils) > 0 {
-		if snap.Enabled {
-			s.Coils[0] = 0x01
-		} else {
-			s.Coils[0] = 0x00
-		}
+	// Now start listening after all handlers are registered.
+	if err := serv.ListenTCP(c.cfg.Addr); err != nil {
+		return fmt.Errorf("mbserver listen tcp %s: %w", c.cfg.Addr, err)
 	}
 
-	// Holding registers
-	if len(s.HoldingRegisters) >= 5 {
-		s.HoldingRegisters[0] = encodeTemp(snap.TemperatureSetpoint)
-		s.HoldingRegisters[1] = encodeTemp(snap.TemperatureSetpointMin)
-		s.HoldingRegisters[2] = encodeTemp(snap.TemperatureSetpointMax)
-		s.HoldingRegisters[3] = uint16(snap.Mode)
-		s.HoldingRegisters[4] = uint16(snap.FanSpeed)
-	} else {
-		// be defensive in case mbserver layout changed; try to set what is present
-		if len(s.HoldingRegisters) > 0 {
-			s.HoldingRegisters[0] = encodeTemp(snap.TemperatureSetpoint)
-		}
-		if len(s.HoldingRegisters) > 1 {
-			s.HoldingRegisters[1] = encodeTemp(snap.TemperatureSetpointMin)
-		}
-		if len(s.HoldingRegisters) > 2 {
-			s.HoldingRegisters[2] = encodeTemp(snap.TemperatureSetpointMax)
-		}
-		if len(s.HoldingRegisters) > 3 {
-			s.HoldingRegisters[3] = uint16(snap.Mode)
-		}
-		if len(s.HoldingRegisters) > 4 {
-			s.HoldingRegisters[4] = uint16(snap.FanSpeed)
-		}
-	}
-
-	// Input registers: ambient temperature at IR 0
-	if len(s.InputRegisters) > 0 {
-		s.InputRegisters[0] = encodeTemp(snap.AmbientTemperature)
-	}
+	// Block until ctx.Done()
+	<-ctx.Done()
+	serv.Close()
+	return ctx.Err()
 }
 
 const TemperatureScale int = 100
@@ -278,4 +285,18 @@ func encodeTemp(v float64) uint16 {
 func decodeTemp(u uint16) float64 {
 	i := int16(u)
 	return float64(i) / float64(TemperatureScale)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
