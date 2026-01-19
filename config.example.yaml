@@ -9,6 +9,10 @@ controllers:
     qos: 0
     retain_snapshot: true
     publish_interval: 1s
+  modbus:
+    enabled: true
+    addr: "localhost:1502"
+    unit_id: 4
 
 thermostat:
   enabled: true

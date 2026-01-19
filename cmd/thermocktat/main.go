@@ -10,6 +10,7 @@ import (
 
 	"github.com/Agrid-Dev/thermocktat/cmd/app"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
+	modbusctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/modbus"
 	mqttctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/mqtt"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
@@ -72,6 +73,24 @@ func main() {
 			log.Printf("mqtt controller broker=%s base_topic=%s", cfg.Controllers.MQTT.BrokerURL, cfg.Controllers.MQTT.BaseTopic)
 			if err := mc.Run(ctx); err != nil && err != context.Canceled {
 				log.Printf("mqtt controller exited: %v", err)
+				cancel()
+			}
+		}()
+	}
+	if cfg.Controllers.MODBUS.Enabled {
+		mc, err := modbusctrl.New(th, modbusctrl.Config{
+			DeviceID:     deviceID,
+			Addr:         cfg.Controllers.MODBUS.Addr,
+			UnitID:       cfg.Controllers.MODBUS.UnitID,
+			SyncInterval: cfg.Controllers.MODBUS.SyncInterval,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() {
+			log.Printf("modbus controller listening to %s with UnitID %d", cfg.Controllers.MODBUS.Addr, cfg.Controllers.MODBUS.UnitID)
+			if err := mc.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("modbus controller exited: %v", err)
 				cancel()
 			}
 		}()
