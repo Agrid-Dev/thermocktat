@@ -16,8 +16,9 @@ import (
 type Config struct {
 	DeviceID    string `json:"device_id" yaml:"device_id"`
 	Controllers struct {
-		HTTP HTTPConfig `json:"http" yaml:"http"`
-		MQTT MQTTConfig `json:"mqtt" yaml:"mqtt"`
+		HTTP   HTTPConfig   `json:"http" yaml:"http"`
+		MQTT   MQTTConfig   `json:"mqtt" yaml:"mqtt"`
+		MODBUS Modbusconfig `json:"modbus" yaml:"modbus"`
 	} `json:"controllers" yaml:"controllers"`
 
 	Thermostat ThermostatConfig `json:"thermostat" yaml:"thermostat"`
@@ -50,6 +51,13 @@ type MQTTConfig struct {
 	PublishInterval time.Duration `json:"publish_interval" yaml:"publish_interval"`
 	Username        string        `json:"username" yaml:"username"`
 	Password        string        `json:"password" yaml:"password"`
+}
+
+type Modbusconfig struct {
+	Enabled      bool          `json:"enabled" yaml:"enabled"`
+	Addr         string        `json:"addr" yaml:"addr"`
+	UnitID       byte          `json:"unit_id" yaml:"unit_id"`
+	SyncInterval time.Duration `json:"sync_interval" yaml:"sync_interval"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -100,6 +108,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Controllers.MQTT.PublishInterval == 0 {
 		cfg.Controllers.MQTT.PublishInterval = 1 * time.Second
+	}
+	if cfg.Controllers.MODBUS.UnitID == 0 {
+		cfg.Controllers.MODBUS.UnitID = 1
 	}
 }
 
