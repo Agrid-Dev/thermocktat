@@ -22,6 +22,7 @@ type Config struct {
 	} `json:"controllers" yaml:"controllers"`
 
 	Thermostat ThermostatConfig `json:"thermostat" yaml:"thermostat"`
+	Regulator  RegulatorConfig  `json:"regulator" yaml:"regulator"`
 }
 
 type ThermostatConfig struct {
@@ -34,6 +35,15 @@ type ThermostatConfig struct {
 
 	Mode     *string `json:"mode" yaml:"mode"`           // "heat" | "cool" | "fan" | "auto"
 	FanSpeed *string `json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
+}
+
+type RegulatorConfig struct {
+	Enabled    bool          `json:"enabled" yaml:"enabled"`
+	Interval   time.Duration `json:"interval" yaml:"interval"`
+	Kp         float64       `json:"p" yaml:"p"`
+	Ki         float64       `json:"i" yaml:"i"`
+	Kd         float64       `json:"d" yaml:"d"`
+	Hysteresis float64       `json:"hysteresis" yaml:"hysteresis"`
 }
 
 type HTTPConfig struct {
@@ -112,6 +122,18 @@ func applyDefaults(cfg *Config) {
 	if cfg.Controllers.MODBUS.UnitID == 0 {
 		cfg.Controllers.MODBUS.UnitID = 1
 	}
+	if cfg.Regulator.Kp == 0.0 {
+		cfg.Regulator.Kp = 0.1
+	}
+	if cfg.Regulator.Ki == 0 {
+		cfg.Regulator.Ki = 0.01
+	}
+	if cfg.Regulator.Kd == 0 {
+		cfg.Regulator.Kd = 0.05
+	}
+	if cfg.Regulator.Interval == 0 {
+		cfg.Regulator.Interval = 1 * time.Second
+	}
 }
 
 func (c Config) Snapshot() (thermostat.Snapshot, error) {
@@ -165,6 +187,15 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 		FanSpeed:               fan,
 		AmbientTemperature:     ambient,
 	}, nil
+}
+
+func (c Config) RegulatorParams() thermostat.PIDRegulatorParams {
+	return thermostat.PIDRegulatorParams{
+		Kp:         c.Regulator.Kp,
+		Ki:         c.Regulator.Ki,
+		Kd:         c.Regulator.Kd,
+		Hysteresis: c.Regulator.Hysteresis,
+	}
 }
 
 func ApplyEnvOverrides(cfg *Config) {

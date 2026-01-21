@@ -30,8 +30,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	regulatorParams := cfg.RegulatorParams()
 
-	th, err := thermostat.New(snap)
+	th, err := thermostat.New(snap, regulatorParams)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,6 +41,17 @@ func main() {
 	defer cancel()
 
 	deviceID := cfg.DeviceID
+
+	// start regulation
+	if cfg.Regulator.Enabled {
+		go func() {
+			if err := th.Run(ctx, cfg.Regulator.Interval); err != nil && err != context.Canceled {
+				log.Printf("thermostat exited: %v", err)
+				cancel()
+			}
+		}()
+
+	}
 
 	// Start enabled controllers
 	if cfg.Controllers.HTTP.Enabled {
