@@ -5,16 +5,41 @@ import (
 	"testing"
 )
 
+func testValidatePIDRegulatorParams(t *testing.T) {
+	paramsOk := PIDRegulatorParams{
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
+	}
+	err := paramsOk.Validate()
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	paramsInvalid := PIDRegulatorParams{
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  2.0,
+	}
+	if paramsInvalid.Validate() != ErrInvalidRegulatorHysteresis {
+		t.Errorf("Expected error, got %v", err)
+	}
+}
+
 func almostEqual(a, b, tolerance float64) bool {
 	return math.Abs(a-b) <= tolerance
 }
 
 func TestGetTarget(t *testing.T) {
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 1.0,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
 	}
 	tests := []struct {
 		name      string
@@ -25,12 +50,12 @@ func TestGetTarget(t *testing.T) {
 		isCooling bool
 		want      float64
 	}{
-		{"Heat is Heating", 20.0, 21.0, ModeHeat, true, false, 21.0},
+		{"Heat is Heating", 20.0, 21.0, ModeHeat, true, false, 20.5},
 		{"Heat not is Heating", 20.0, 21.0, ModeHeat, false, false, 20.0},
-		{"Cool is Cooling", 20.0, 19.0, ModeCool, false, true, 19.0},
+		{"Cool is Cooling", 20.0, 19.0, ModeCool, false, true, 19.5},
 		{"Cool not is Cooling", 20.0, 19.0, ModeCool, false, false, 20.0},
-		{"Auto is heating", 20.0, 21.0, ModeAuto, true, false, 21.0},
-		{"Auto is cooling", 20.0, 19.0, ModeAuto, false, true, 19.0},
+		{"Auto is heating", 20.0, 21.0, ModeAuto, true, false, 20.5},
+		{"Auto is cooling", 20.0, 19.0, ModeAuto, false, true, 19.5},
 		{"Auto not heating or cooling", 20.0, 20.0, ModeAuto, false, false, 20.0},
 		{"Fan", 20.0, 21.0, ModeFan, false, false, 20.0},
 	}
@@ -60,10 +85,11 @@ func assertRegulatorState(t testing.TB, regulator *PIDRegulator, wantHeating boo
 
 func TestPIDActivate(t *testing.T) {
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 1.0,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
 	}
 	tests := []struct {
 		name        string
@@ -96,10 +122,11 @@ func TestPIDActivate(t *testing.T) {
 
 func TestPIDDeActivate(t *testing.T) {
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 1.0,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.8,
 	}
 	tests := []struct {
 		name             string
@@ -113,8 +140,8 @@ func TestPIDDeActivate(t *testing.T) {
 	}{
 		{"Keep heating while setpoint + hysteresis not reached", 22.0, 20.0, ModeHeat, true, true, false, false},
 		{"Keep heating while setpoint + hysteresis not reached", 22.0, 22.5, ModeHeat, true, true, false, false},
-		{"Keep cooling while setpoint - hysteresis not reached", 20.0, 22.0, ModeHeat, false, false, true, true},
-		{"Keep cooling while setpoint - hysteresis not reached", 20.0, 19.5, ModeHeat, false, false, true, true},
+		{"Keep cooling while setpoint - hysteresis not reached", 20.0, 22.0, ModeCool, false, false, true, true},
+		{"Keep cooling while setpoint - hysteresis not reached", 20.0, 19.5, ModeCool, false, false, true, true},
 		{"Keep heating while setpoint +/- hysteresis not reached (auto)", 22.0, 20.0, ModeAuto, true, true, false, false},
 		{"Keep heating while setpoint +/- hysteresis not reached (auto)", 22.0, 22.5, ModeAuto, true, true, false, false},
 		{"Keep cooling while setpoint -/- hysteresis not reached (auto)", 20.0, 22.0, ModeAuto, false, false, true, true},
@@ -139,10 +166,11 @@ func TestPIDDeActivate(t *testing.T) {
 
 func TestPIDRegulatorStart(t *testing.T) {
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 1.0,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
 	}
 
 	approx := 0.05
@@ -156,12 +184,12 @@ func TestPIDRegulatorStart(t *testing.T) {
 		want      float64
 		tolerance float64
 	}{
-		{"HeatModeReg", 25.0, 20.0, ModeHeat, 20.95, approx}, // outside hysteresis : start regulating
-		{"CoolModeReg", 20.0, 25.0, ModeCool, 24.05, approx},
+		{"HeatModeReg", 25.0, 20.0, ModeHeat, 20.88, approx}, // outside hysteresis : start regulating
+		{"CoolModeReg", 20.0, 25.0, ModeCool, 24.12, approx},
 		{"FanModeReg", 25.0, 20.0, ModeFan, 20.0, approx},
 		{"FanModeReg", 20.0, 25.0, ModeFan, 25.0, approx},
-		{"AutoModeRegHeat", 25.0, 20.0, ModeAuto, 20.96, approx},
-		{"AutoModeRegCool", 20.0, 25.0, ModeAuto, 24.04, approx},
+		{"AutoModeRegHeat", 25.0, 20.0, ModeAuto, 20.88, approx},
+		{"AutoModeRegCool", 20.0, 25.0, ModeAuto, 24.12, approx},
 		{"HeatModeRegWithinHysteresisUp", 20.0, 20.5, ModeHeat, 20.5, exact}, // within hysteresis : no regulation
 		{"HeatModeRegWithinHysteresisDown", 20.0, 19.5, ModeHeat, 19.5, exact},
 		{"CoolModeRegWithinHysteresisUp", 20.0, 20.5, ModeCool, 20.5, exact},
@@ -183,10 +211,11 @@ func TestPIDRegulatorStart(t *testing.T) {
 
 func TestPidRegulatorHeating(t *testing.T) {
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 1.0,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
 	}
 	regulator := NewPIDRegulator(params)
 	if regulator.isHeating || regulator.isCooling {
@@ -197,7 +226,7 @@ func TestPidRegulatorHeating(t *testing.T) {
 	iterations := 0
 	maxIterations := 1000
 
-	for ambient < setpoint+params.Hysteresis && iterations < maxIterations {
+	for ambient < setpoint+params.TargetHysteresis && iterations < maxIterations {
 		newAmbient := regulator.Update(setpoint, ambient, ModeHeat)
 		if newAmbient < ambient {
 			t.Errorf("Ambient temperature should not decrease when heating, have %f < %f (iteration %d)", newAmbient, ambient, iterations)
@@ -219,7 +248,7 @@ func TestPidRegulatorHeating(t *testing.T) {
 	}
 	regulator.Activate(setpoint, ambient, ModeHeat)
 	if regulator.isHeating {
-		t.Errorf("Regulator should be done heating after reaching setpoint + hysteresis")
+		t.Errorf("Regulator should be done heating after reaching setpoint + targetHysteresis")
 	}
 
 }
@@ -235,10 +264,11 @@ func TestThermostatUpdateAmbientTemperature(t *testing.T) {
 		FanSpeed:               FanAuto,
 	}
 	params := PIDRegulatorParams{
-		Kp:         0.1,
-		Ki:         0.01,
-		Kd:         0.05,
-		Hysteresis: 0.5,
+		Kp:                0.1,
+		Ki:                0.01,
+		Kd:                0.05,
+		TriggerHysteresis: 1.0,
+		TargetHysteresis:  0.5,
 	}
 	thermostat, err := New(initial, params)
 	if err != nil {

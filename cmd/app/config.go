@@ -38,12 +38,13 @@ type ThermostatConfig struct {
 }
 
 type RegulatorConfig struct {
-	Enabled    bool          `json:"enabled" yaml:"enabled"`
-	Interval   time.Duration `json:"interval" yaml:"interval"`
-	Kp         float64       `json:"p" yaml:"p"`
-	Ki         float64       `json:"i" yaml:"i"`
-	Kd         float64       `json:"d" yaml:"d"`
-	Hysteresis float64       `json:"hysteresis" yaml:"hysteresis"`
+	Enabled           bool          `json:"enabled" yaml:"enabled"`
+	Interval          time.Duration `json:"interval" yaml:"interval"`
+	Kp                float64       `json:"p" yaml:"p"`
+	Ki                float64       `json:"i" yaml:"i"`
+	Kd                float64       `json:"d" yaml:"d"`
+	TriggerHysteresis float64       `json:"trigger_hysteresis" yaml:"trigger_hysteresis"`
+	TargetHysteresis  float64       `json:"target_hysteresis" yaml:"target_hysteresis"`
 }
 
 type HTTPConfig struct {
@@ -189,13 +190,19 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 	}, nil
 }
 
-func (c Config) RegulatorParams() thermostat.PIDRegulatorParams {
-	return thermostat.PIDRegulatorParams{
-		Kp:         c.Regulator.Kp,
-		Ki:         c.Regulator.Ki,
-		Kd:         c.Regulator.Kd,
-		Hysteresis: c.Regulator.Hysteresis,
+func (c Config) RegulatorParams() (thermostat.PIDRegulatorParams, error) {
+	params := thermostat.PIDRegulatorParams{
+		Kp:                c.Regulator.Kp,
+		Ki:                c.Regulator.Ki,
+		Kd:                c.Regulator.Kd,
+		TriggerHysteresis: c.Regulator.TriggerHysteresis,
+		TargetHysteresis:  c.Regulator.TargetHysteresis,
 	}
+	err := params.Validate()
+	if err != nil {
+		return thermostat.PIDRegulatorParams{}, err
+	}
+	return params, nil
 }
 
 func ApplyEnvOverrides(cfg *Config) {

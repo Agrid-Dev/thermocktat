@@ -30,8 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	regulatorParams := cfg.RegulatorParams()
-
+	regulatorParams, err := cfg.RegulatorParams()
+	if err != nil {
+		log.Fatal(err)
+	}
 	th, err := thermostat.New(snap, regulatorParams)
 	if err != nil {
 		log.Fatal(err)
