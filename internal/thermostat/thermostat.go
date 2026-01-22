@@ -1,7 +1,9 @@
 package thermostat
 
 import (
+	"context"
 	"sync"
+	"time"
 )
 
 type Snapshot struct {
@@ -15,16 +17,18 @@ type Snapshot struct {
 }
 
 type Thermostat struct {
-	mu sync.RWMutex
-	s  Snapshot
+	mu  sync.RWMutex
+	s   Snapshot
+	reg PIDRegulator
 }
 
-func New(initial Snapshot) (*Thermostat, error) {
+func New(initial Snapshot, pidParams PIDRegulatorParams) (*Thermostat, error) {
 	t := &Thermostat{}
 	if err := validateSnapshot(initial); err != nil {
 		return nil, err
 	}
 	t.s = initial
+	t.reg = *NewPIDRegulator(pidParams)
 	return t, nil
 }
 
@@ -118,4 +122,18 @@ func (t *Thermostat) setAmbient(temp float64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.s.AmbientTemperature = temp
+}
+
+func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			t.UpdateAmbientTemperature()
+		}
+	}
 }

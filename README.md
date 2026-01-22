@@ -20,6 +20,22 @@ A lightweight thermostat emulator, primarily designed for BMS software testing (
 | setpoint_temperature_max  | float   | 28.0      | `setpoint` upper bound.   |
 
 
+## Regulation - ambient temperature simulation
+
+The regulation of ambient temperature is simulated using a [PID regulator](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller) and hysteresis (see diagram below).
+
+
+<p align="center">
+  <img src="assets/thermocktat_regulation.png" alt="Thermocktat Regulation Diagram"/>
+</p>
+
+Regulation simulates the effect of heating or cooling systems controlled by the thermostat that will actually heat and cool the room in order to reach the desired temperature (setpoint).
+
+This example is for the heating mode. If the ambient temperature is above setpoint, or below within a hysteresis range (- `TriggerHysteresis`, 1°C in this example), heating is not triggered. When it is lower with a difference greater than the trigger hysteresis, heating start until the target temperature is reached. The target is the setpoint temperature plus a target hysteresis (0.5°C here).
+
+The reason for having 2 different hysteresis values is to avoid infinite loops in the `auto` mode. Otherwise, reaching target temperature after heating would immediately trigger cooling down to the lower hysteresis bound, which would again trigger heating, and so on. This is why `TargetHysteresis` must always be lower than `TriggerHysteresis`. 
+
+Regulation params can be set in the `config.yaml` file (see `config.example.yaml`). Regulation can also be disabled (in this case, ambient temperature will remain constant).
 
 ## API Documentation
 - [HTTP Controller API](internal/controllers/http/README.md)

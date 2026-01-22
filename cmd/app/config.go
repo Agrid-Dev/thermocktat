@@ -22,6 +22,7 @@ type Config struct {
 	} `json:"controllers" yaml:"controllers"`
 
 	Thermostat ThermostatConfig `json:"thermostat" yaml:"thermostat"`
+	Regulator  RegulatorConfig  `json:"regulator" yaml:"regulator"`
 }
 
 type ThermostatConfig struct {
@@ -34,6 +35,16 @@ type ThermostatConfig struct {
 
 	Mode     *string `json:"mode" yaml:"mode"`           // "heat" | "cool" | "fan" | "auto"
 	FanSpeed *string `json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
+}
+
+type RegulatorConfig struct {
+	Enabled           bool          `json:"enabled" yaml:"enabled"`
+	Interval          time.Duration `json:"interval" yaml:"interval"`
+	Kp                float64       `json:"p" yaml:"p"`
+	Ki                float64       `json:"i" yaml:"i"`
+	Kd                float64       `json:"d" yaml:"d"`
+	TriggerHysteresis float64       `json:"trigger_hysteresis" yaml:"trigger_hysteresis"`
+	TargetHysteresis  float64       `json:"target_hysteresis" yaml:"target_hysteresis"`
 }
 
 type HTTPConfig struct {
@@ -112,6 +123,18 @@ func applyDefaults(cfg *Config) {
 	if cfg.Controllers.MODBUS.UnitID == 0 {
 		cfg.Controllers.MODBUS.UnitID = 1
 	}
+	if cfg.Regulator.Kp == 0.0 {
+		cfg.Regulator.Kp = 0.1
+	}
+	if cfg.Regulator.Ki == 0 {
+		cfg.Regulator.Ki = 0.01
+	}
+	if cfg.Regulator.Kd == 0 {
+		cfg.Regulator.Kd = 0.05
+	}
+	if cfg.Regulator.Interval == 0 {
+		cfg.Regulator.Interval = 1 * time.Second
+	}
 }
 
 func (c Config) Snapshot() (thermostat.Snapshot, error) {
@@ -165,6 +188,21 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 		FanSpeed:               fan,
 		AmbientTemperature:     ambient,
 	}, nil
+}
+
+func (c Config) RegulatorParams() (thermostat.PIDRegulatorParams, error) {
+	params := thermostat.PIDRegulatorParams{
+		Kp:                c.Regulator.Kp,
+		Ki:                c.Regulator.Ki,
+		Kd:                c.Regulator.Kd,
+		TriggerHysteresis: c.Regulator.TriggerHysteresis,
+		TargetHysteresis:  c.Regulator.TargetHysteresis,
+	}
+	err := params.Validate()
+	if err != nil {
+		return thermostat.PIDRegulatorParams{}, err
+	}
+	return params, nil
 }
 
 func ApplyEnvOverrides(cfg *Config) {

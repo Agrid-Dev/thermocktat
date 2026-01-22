@@ -1,3 +1,5 @@
 coverage.out
 coverage.txt
 mosquitto.conf
+config.yaml
+thermocktat.csv
