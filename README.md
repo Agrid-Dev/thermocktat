@@ -47,25 +47,38 @@ Regulation params can be set in the `config.yaml` file (see `config.example.yaml
 
 ## Configuration
 
-Can dynamically populate initial values and set server configuration with a `config.yaml` file (see `config.example.yaml`).
+Thermocktat can be configure from file (see `config.example.yaml`).
 
 Usage:
 ```sh
 go run ./cmd/thermocktat -config config.yaml
 ```
 
+Configuration can also be passed using environment variables with the `TMK_` prefix. Environment variables have priority over config file.
+
 If no config is provided, default values will be used and server will run on port 8080.
 
-Can also run with environment variables (which have priority over config) :
+For each controller, the `addr` field is in the format `host:port` (`host` will be `localhost` by default). For most controllers, it is used to set the url that the server will expose. For `mqtt`, `addr` is the address of the broker.
+
+Example:
+
 ```sh
-THERMOCKSTAT_HTTP_ADDR=:3001 go run ./cmd/thermocktat
-# or
-PORT=3001 go run ./cmd/thermocktat
+TMK_CONTROLLER=http \
+TMK_ADDR=:8080 \
+go run ./cmd/thermocktat
 ```
 
 ## Docker Examples
 
 ```sh
+# Run with default params
 docker run -p 8080:8080 thermocktat
+
+# Set controller and address using environment variables
+docker run --rm -e TMK_CONTROLLER=http -e TMK_ADDR=:8080 -p 8080:8080 thermocktat-dev
+docker run --rm -e TMK_CONTROLLER=mqtt -e TMK_ADDR=tcp://host.docker.internal:1883 -e TMK_DEVICE_ID=my-thermocktat thermocktat
+docker run --rm -e TMK_CONTROLLER=modbus -e TMK_ADDR=0.0.0.0:1502 -e TMK_DEVICE_ID=my-thermocktat-2 -p 1502:1502 thermocktat
+
+# Run with a config file mounted as a volume
 docker run -v $(pwd)/config.yaml:/config.yaml -p 8080:8080 thermocktat -config /config.yaml
 ```

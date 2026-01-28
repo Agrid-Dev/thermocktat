@@ -24,7 +24,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.ApplyEnvOverrides(&cfg)
 
 	snap, err := cfg.Snapshot()
 	if err != nil {
@@ -70,7 +69,7 @@ func main() {
 	if cfg.Controllers.MQTT.Enabled {
 		mc, err := mqttctrl.New(th, mqttctrl.Config{
 			DeviceID:        deviceID,
-			BrokerURL:       cfg.Controllers.MQTT.BrokerURL,
+			BrokerURL:       cfg.Controllers.MQTT.Addr,
 			ClientID:        cfg.Controllers.MQTT.ClientID,
 			BaseTopic:       cfg.Controllers.MQTT.BaseTopic,
 			QoS:             cfg.Controllers.MQTT.QoS,
@@ -84,7 +83,7 @@ func main() {
 		}
 
 		go func() {
-			log.Printf("mqtt controller broker=%s base_topic=%s", cfg.Controllers.MQTT.BrokerURL, cfg.Controllers.MQTT.BaseTopic)
+			log.Printf("mqtt controller broker=%s base_topic=%s", cfg.Controllers.MQTT.Addr, cfg.Controllers.MQTT.BaseTopic)
 			if err := mc.Run(ctx); err != nil && err != context.Canceled {
 				log.Printf("mqtt controller exited: %v", err)
 				cancel()

@@ -1,140 +1,286 @@
 package app
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	kjson "github.com/knadh/koanf/parsers/json"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env/v2"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/providers/structs"
+	"github.com/knadh/koanf/v2"
 
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
 type Config struct {
-	DeviceID    string `json:"device_id" yaml:"device_id"`
-	Controllers struct {
-		HTTP   HTTPConfig   `json:"http" yaml:"http"`
-		MQTT   MQTTConfig   `json:"mqtt" yaml:"mqtt"`
-		MODBUS Modbusconfig `json:"modbus" yaml:"modbus"`
-	} `json:"controllers" yaml:"controllers"`
+	DeviceID string `koanf:"device_id" json:"device_id" yaml:"device_id"`
 
-	Thermostat ThermostatConfig `json:"thermostat" yaml:"thermostat"`
-	Regulator  RegulatorConfig  `json:"regulator" yaml:"regulator"`
+	// Convenience keys:
+	// If Controller is set, only that controller is enabled (http|mqtt|modbus).
+	// If Addr is set alongside Controller, it is copied to the chosen controller's addr.
+	Controller string `koanf:"controller" json:"controller" yaml:"controller"`
+	Addr       string `koanf:"addr" json:"addr" yaml:"addr"`
+
+	Controllers struct {
+		HTTP   HTTPConfig   `koanf:"http" json:"http" yaml:"http"`
+		MQTT   MQTTConfig   `koanf:"mqtt" json:"mqtt" yaml:"mqtt"`
+		MODBUS Modbusconfig `koanf:"modbus" json:"modbus" yaml:"modbus"`
+	} `koanf:"controllers" json:"controllers" yaml:"controllers"`
+
+	Thermostat ThermostatConfig `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
+	Regulator  RegulatorConfig  `koanf:"regulator" json:"regulator" yaml:"regulator"`
 }
 
 type ThermostatConfig struct {
-	Enabled            *bool    `json:"enabled" yaml:"enabled"`
-	AmbientTemperature *float64 `json:"ambient_temperature" yaml:"ambient_temperature"`
+	Enabled            *bool    `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	AmbientTemperature *float64 `koanf:"ambient_temperature" json:"ambient_temperature" yaml:"ambient_temperature"`
 
-	Setpoint    *float64 `json:"temperature_setpoint" yaml:"temperature_setpoint"`
-	SetpointMin *float64 `json:"temperature_setpoint_min" yaml:"temperature_setpoint_min"`
-	SetpointMax *float64 `json:"temperature_setpoint_max" yaml:"temperature_setpoint_max"`
+	Setpoint    *float64 `koanf:"temperature_setpoint" json:"temperature_setpoint" yaml:"temperature_setpoint"`
+	SetpointMin *float64 `koanf:"temperature_setpoint_min" json:"temperature_setpoint_min" yaml:"temperature_setpoint_min"`
+	SetpointMax *float64 `koanf:"temperature_setpoint_max" json:"temperature_setpoint_max" yaml:"temperature_setpoint_max"`
 
-	Mode     *string `json:"mode" yaml:"mode"`           // "heat" | "cool" | "fan" | "auto"
-	FanSpeed *string `json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
+	Mode     *string `koanf:"mode" json:"mode" yaml:"mode"`                // "heat" | "cool" | "fan" | "auto"
+	FanSpeed *string `koanf:"fan_speed" json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
 }
 
 type RegulatorConfig struct {
-	Enabled           bool          `json:"enabled" yaml:"enabled"`
-	Interval          time.Duration `json:"interval" yaml:"interval"`
-	Kp                float64       `json:"p" yaml:"p"`
-	Ki                float64       `json:"i" yaml:"i"`
-	Kd                float64       `json:"d" yaml:"d"`
-	TriggerHysteresis float64       `json:"trigger_hysteresis" yaml:"trigger_hysteresis"`
-	TargetHysteresis  float64       `json:"target_hysteresis" yaml:"target_hysteresis"`
+	Enabled           bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Interval          time.Duration `koanf:"interval" json:"interval" yaml:"interval"`
+	Kp                float64       `koanf:"p" json:"p" yaml:"p"`
+	Ki                float64       `koanf:"i" json:"i" yaml:"i"`
+	Kd                float64       `koanf:"d" json:"d" yaml:"d"`
+	TriggerHysteresis float64       `koanf:"trigger_hysteresis" json:"trigger_hysteresis" yaml:"trigger_hysteresis"`
+	TargetHysteresis  float64       `koanf:"target_hysteresis" json:"target_hysteresis" yaml:"target_hysteresis"`
 }
 
 type HTTPConfig struct {
-	Enabled bool   `json:"enabled" yaml:"enabled"`
-	Addr    string `json:"addr" yaml:"addr"`
+	Enabled bool   `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Addr    string `koanf:"addr" json:"addr" yaml:"addr"`
 }
 
 type MQTTConfig struct {
-	Enabled         bool          `json:"enabled" yaml:"enabled"`
-	BrokerURL       string        `json:"broker_url" yaml:"broker_url"`
-	ClientID        string        `json:"client_id" yaml:"client_id"`
-	BaseTopic       string        `json:"base_topic" yaml:"base_topic"`
-	QoS             byte          `json:"qos" yaml:"qos"`
-	RetainSnapshot  bool          `json:"retain_snapshot" yaml:"retain_snapshot"`
-	PublishInterval time.Duration `json:"publish_interval" yaml:"publish_interval"`
-	Username        string        `json:"username" yaml:"username"`
-	Password        string        `json:"password" yaml:"password"`
+	Enabled         bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Addr            string        `koanf:"addr" json:"addr" yaml:"addr"`
+	ClientID        string        `koanf:"client_id" json:"client_id" yaml:"client_id"`
+	BaseTopic       string        `koanf:"base_topic" json:"base_topic" yaml:"base_topic"`
+	QoS             byte          `koanf:"qos" json:"qos" yaml:"qos"`
+	RetainSnapshot  bool          `koanf:"retain_snapshot" json:"retain_snapshot" yaml:"retain_snapshot"`
+	PublishInterval time.Duration `koanf:"publish_interval" json:"publish_interval" yaml:"publish_interval"`
+	Username        string        `koanf:"username" json:"username" yaml:"username"`
+	Password        string        `koanf:"password" json:"password" yaml:"password"`
 }
 
 type Modbusconfig struct {
-	Enabled      bool          `json:"enabled" yaml:"enabled"`
-	Addr         string        `json:"addr" yaml:"addr"`
-	UnitID       byte          `json:"unit_id" yaml:"unit_id"`
-	SyncInterval time.Duration `json:"sync_interval" yaml:"sync_interval"`
+	Enabled      bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Addr         string        `koanf:"addr" json:"addr" yaml:"addr"`
+	UnitID       byte          `koanf:"unit_id" json:"unit_id" yaml:"unit_id"`
+	SyncInterval time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
+}
+
+func DefaultConfig() Config {
+	var cfg Config
+
+	cfg.DeviceID = "default"
+
+	cfg.Controllers.HTTP.Addr = ":8080"
+	cfg.Controllers.MQTT.PublishInterval = 1 * time.Second
+	cfg.Controllers.MODBUS.UnitID = 1
+
+	cfg.Regulator.Kp = 0.1
+	cfg.Regulator.Ki = 0.01
+	cfg.Regulator.Kd = 0.05
+	cfg.Regulator.Interval = 1 * time.Second
+
+	return cfg
 }
 
 func LoadConfig(path string) (Config, error) {
+	k := koanf.New(".")
+
+	// 1) Defaults
+	if err := k.Load(structs.Provider(DefaultConfig(), "koanf"), nil); err != nil {
+		return Config{}, fmt.Errorf("load defaults: %w", err)
+	}
+
+	// 2) Optional file layer
+	if path != "" {
+		if _, err := os.Stat(path); err != nil {
+			if !os.IsNotExist(err) {
+				return Config{}, fmt.Errorf("stat config file: %w", err)
+			}
+			// missing file is OK → defaults + env only
+		} else {
+			ext := strings.ToLower(filepath.Ext(path))
+			switch ext {
+			case ".yaml", ".yml":
+				if err := k.Load(file.Provider(path), yaml.Parser()); err != nil {
+					return Config{}, fmt.Errorf("load yaml config: %w", err)
+				}
+			case ".json":
+				if err := k.Load(file.Provider(path), kjson.Parser()); err != nil {
+					return Config{}, fmt.Errorf("load json config: %w", err)
+				}
+			default:
+				return Config{}, fmt.Errorf("unsupported config extension %q", ext)
+			}
+		}
+	}
+
+	// 3) Env layer (TMK_*), overrides file + defaults
+	if err := k.Load(
+		env.Provider(".", env.Opt{
+			Prefix: "TMK_",
+			TransformFunc: func(k, v string) (string, any) {
+				k = strings.TrimPrefix(k, "TMK_")
+				key := envKeyTransform(k)
+				if key == "" {
+					return "", nil // ignore
+				}
+				return key, v
+			},
+		}),
+		nil,
+	); err != nil {
+		return Config{}, fmt.Errorf("load env: %w", err)
+	}
+
 	var cfg Config
-
-	if path == "" {
-		applyDefaults(&cfg)
-		return cfg, nil
+	if err := k.Unmarshal("", &cfg); err != nil {
+		return Config{}, fmt.Errorf("unmarshal config: %w", err)
 	}
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Config file missing → use defaults
-			applyDefaults(&cfg)
-			return cfg, nil
-		}
-		return cfg, fmt.Errorf("read config: %w", err)
+	normalize(&cfg)
+	if err := validate(cfg); err != nil {
+		return Config{}, err
 	}
-
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			return cfg, fmt.Errorf("parse yaml: %w", err)
-		}
-	case ".json":
-		if err := json.Unmarshal(data, &cfg); err != nil {
-			return cfg, fmt.Errorf("parse json: %w", err)
-		}
-	default:
-		return cfg, fmt.Errorf("unsupported config extension %q", ext)
-	}
-
-	applyDefaults(&cfg)
 	return cfg, nil
 }
 
-func applyDefaults(cfg *Config) {
-	if cfg.DeviceID == "" {
-		cfg.DeviceID = "default"
+// envKeyTransform maps TMK_* env vars to koanf keys.
+//
+// Rules:
+// - TMK_DEVICE_ID          -> device_id
+// - TMK_CONTROLLER         -> controller
+// - TMK_ADDR               -> addr
+// - TMK_CONTROLLERS_HTTP_ADDR              -> controllers.http.addr
+// - TMK_CONTROLLERS_MQTT_PUBLISH_INTERVAL  -> controllers.mqtt.publish_interval
+// - TMK_THERMOSTAT_TEMPERATURE_SETPOINT    -> thermostat.temperature_setpoint
+// - TMK_REGULATOR_TRIGGER_HYSTERESIS       -> regulator.trigger_hysteresis
+func envKeyTransform(k string) string {
+	// k is the env var name without the prefix "TMK_"
+	key := strings.ToLower(strings.TrimSpace(k))
+	if key == "" {
+		return ""
 	}
-	if cfg.Controllers.HTTP.Addr == "" {
-		cfg.Controllers.HTTP.Addr = ":8080"
+
+	parts := strings.Split(key, "_")
+	if len(parts) == 0 {
+		return key
 	}
-	if !cfg.Controllers.HTTP.Enabled && !cfg.Controllers.MQTT.Enabled {
-		cfg.Controllers.HTTP.Enabled = true
+
+	switch parts[0] {
+	case "controllers":
+		// controllers_<ctrl>_<field...> -> controllers.<ctrl>.<field_with_underscores>
+		if len(parts) < 3 {
+			return key
+		}
+		ctrl := parts[1]
+		field := strings.Join(parts[2:], "_")
+		return "controllers." + ctrl + "." + field
+
+	case "thermostat":
+		// thermostat_<field...> -> thermostat.<field_with_underscores>
+		if len(parts) < 2 {
+			return key
+		}
+		field := strings.Join(parts[1:], "_")
+		return "thermostat." + field
+
+	case "regulator":
+		// regulator_<field...> -> regulator.<field_with_underscores>
+		if len(parts) < 2 {
+			return key
+		}
+		field := strings.Join(parts[1:], "_")
+		return "regulator." + field
+
+	default:
+		// top-level keys keep underscores (device_id, controller, addr, etc.)
+		return key
 	}
-	if cfg.Controllers.MQTT.PublishInterval == 0 {
-		cfg.Controllers.MQTT.PublishInterval = 1 * time.Second
+}
+
+func normalize(cfg *Config) {
+	// Convenience: controller + addr -> enable and disable all others
+	if cfg.Controller != "" {
+		c := strings.ToLower(strings.TrimSpace(cfg.Controller))
+		cfg.Controllers.HTTP.Enabled = false
+		cfg.Controllers.MQTT.Enabled = false
+		cfg.Controllers.MODBUS.Enabled = false
+
+		switch c {
+		case "http":
+			cfg.Controllers.HTTP.Enabled = true
+			if cfg.Addr != "" {
+				cfg.Controllers.HTTP.Addr = cfg.Addr
+			}
+		case "mqtt":
+			cfg.Controllers.MQTT.Enabled = true
+			if cfg.Addr != "" {
+				cfg.Controllers.MQTT.Addr = cfg.Addr
+			}
+		case "modbus":
+			cfg.Controllers.MODBUS.Enabled = true
+			if cfg.Addr != "" {
+				cfg.Controllers.MODBUS.Addr = cfg.Addr
+			}
+		}
 	}
-	if cfg.Controllers.MODBUS.UnitID == 0 {
-		cfg.Controllers.MODBUS.UnitID = 1
+
+	// Common container fallback: PORT (only affects HTTP if enabled and addr not explicitly set)
+	if cfg.Controllers.HTTP.Enabled && strings.TrimSpace(cfg.Controllers.HTTP.Addr) == "" {
+		if p := strings.TrimSpace(os.Getenv("PORT")); p != "" {
+			cfg.Controllers.HTTP.Addr = ":" + p
+		}
 	}
-	if cfg.Regulator.Kp == 0.0 {
-		cfg.Regulator.Kp = 0.1
+}
+
+func validate(cfg Config) error {
+	if cfg.Controller != "" {
+		switch strings.ToLower(strings.TrimSpace(cfg.Controller)) {
+		case "http", "mqtt", "modbus":
+		default:
+			return fmt.Errorf("invalid controller %q (expected http|mqtt|modbus)", cfg.Controller)
+		}
 	}
-	if cfg.Regulator.Ki == 0 {
-		cfg.Regulator.Ki = 0.01
+
+	if cfg.Controllers.HTTP.Enabled && strings.TrimSpace(cfg.Controllers.HTTP.Addr) == "" {
+		return errors.New("http controller enabled but controllers.http.addr is empty")
 	}
-	if cfg.Regulator.Kd == 0 {
-		cfg.Regulator.Kd = 0.05
+	if cfg.Controllers.MQTT.Enabled && strings.TrimSpace(cfg.Controllers.MQTT.Addr) == "" {
+		return errors.New("mqtt controller enabled but controllers.mqtt.addr is empty")
 	}
-	if cfg.Regulator.Interval == 0 {
-		cfg.Regulator.Interval = 1 * time.Second
+	if cfg.Controllers.MODBUS.Enabled && strings.TrimSpace(cfg.Controllers.MODBUS.Addr) == "" {
+		return errors.New("modbus controller enabled but controllers.modbus.addr is empty")
 	}
+
+	if cfg.Regulator.Interval < 0 {
+		return errors.New("regulator.interval must be >= 0")
+	}
+	if cfg.Controllers.MQTT.PublishInterval < 0 {
+		return errors.New("controllers.mqtt.publish_interval must be >= 0")
+	}
+	if cfg.Controllers.MODBUS.SyncInterval < 0 {
+		return errors.New("controllers.modbus.sync_interval must be >= 0")
+	}
+
+	return nil
 }
 
 func (c Config) Snapshot() (thermostat.Snapshot, error) {
@@ -198,25 +344,8 @@ func (c Config) RegulatorParams() (thermostat.PIDRegulatorParams, error) {
 		TriggerHysteresis: c.Regulator.TriggerHysteresis,
 		TargetHysteresis:  c.Regulator.TargetHysteresis,
 	}
-	err := params.Validate()
-	if err != nil {
+	if err := params.Validate(); err != nil {
 		return thermostat.PIDRegulatorParams{}, err
 	}
 	return params, nil
-}
-
-func ApplyEnvOverrides(cfg *Config) {
-	// Explicit addr prefered, else support PORT (common in containers).
-	if v := os.Getenv("THERMOCKSTAT_HTTP_ADDR"); v != "" {
-		cfg.Controllers.HTTP.Addr = v
-		return
-	}
-	if v := os.Getenv("PORT"); v != "" {
-		// listen on all interfaces on that port
-		cfg.Controllers.HTTP.Addr = ":" + v
-		return
-	}
-	if v := os.Getenv("THERMOCKTAT_DEVICE_ID"); v != "" {
-		cfg.DeviceID = v
-	}
 }
