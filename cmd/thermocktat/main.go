@@ -75,6 +75,7 @@ func main() {
 			QoS:             cfg.Controllers.MQTT.QoS,
 			RetainSnapshot:  cfg.Controllers.MQTT.RetainSnapshot,
 			PublishInterval: cfg.Controllers.MQTT.PublishInterval,
+			PublishMode:     cfg.Controllers.MQTT.PublishMode,
 			Username:        cfg.Controllers.MQTT.Username,
 			Password:        cfg.Controllers.MQTT.Password,
 		})
