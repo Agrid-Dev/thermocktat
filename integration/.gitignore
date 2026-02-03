@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.coverage
+coverage.xml
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.ty/
+../DS_Store
+.DS_Store
+.python-version
+.bin/
