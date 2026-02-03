@@ -145,7 +145,9 @@ func (c *Controller) publishSnapshot() {
 		Mode:                   s.Mode.String(),
 		FanSpeed:               s.FanSpeed.String(),
 		AmbientTemperature:     s.AmbientTemperature,
+		DeviceId:               c.cfg.DeviceID,
 	}
+
 	b, _ := json.Marshal(dto)
 	c.client.Publish(c.topic("snapshot"), c.cfg.QoS, c.cfg.RetainSnapshot, b)
 }
@@ -158,6 +160,7 @@ type snapshotDTO struct {
 	Mode                   string  `json:"mode"`
 	FanSpeed               string  `json:"fan_speed"`
 	AmbientTemperature     float64 `json:"ambient_temperature"`
+	DeviceId               string  `json:"device_id"`
 }
 
 // Command payload format: {"value": ...}
