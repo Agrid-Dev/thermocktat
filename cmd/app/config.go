@@ -71,6 +71,7 @@ type MQTTConfig struct {
 	BaseTopic       string        `koanf:"base_topic" json:"base_topic" yaml:"base_topic"`
 	QoS             byte          `koanf:"qos" json:"qos" yaml:"qos"`
 	RetainSnapshot  bool          `koanf:"retain_snapshot" json:"retain_snapshot" yaml:"retain_snapshot"`
+	PublishMode     string        `koanf:"publish_mode" json:"publish_mode" yaml:"publish_mode"`
 	PublishInterval time.Duration `koanf:"publish_interval" json:"publish_interval" yaml:"publish_interval"`
 	Username        string        `koanf:"username" json:"username" yaml:"username"`
 	Password        string        `koanf:"password" json:"password" yaml:"password"`

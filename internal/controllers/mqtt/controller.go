@@ -7,13 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+)
+
+const (
+	PublishOnChange string = "on_change"
+	PublishInterval string = "interval"
 )
 
 type Config struct {
@@ -31,6 +35,10 @@ type Config struct {
 	QoS             byte
 	RetainSnapshot  bool
 	PublishInterval time.Duration
+	// PublishMode controls when snapshots are published:
+	// - "on_change": publish only when snapshot has changed (default)
+	// - "interval":  publish every PublishInterval even if unchanged
+	PublishMode string
 
 	Username string
 	Password string
@@ -59,6 +67,13 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	if cfg.PublishInterval <= 0 {
 		cfg.PublishInterval = 1 * time.Second
 	}
+	// Default publish mode is on_change
+	if cfg.PublishMode == "" {
+		cfg.PublishMode = PublishOnChange
+	}
+	if cfg.PublishMode != PublishOnChange && cfg.PublishMode != PublishInterval {
+		return nil, fmt.Errorf("mqtt: invalid PublishMode %q", cfg.PublishMode)
+	}
 	if cfg.QoS > 1 {
 		return nil, errors.New("mqtt: QoS must be 0 or 1")
 	}
@@ -83,7 +98,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	// Subscribe when connected/reconnected.
 	opts.OnConnect = func(cl mqtt.Client) {
-		log.Printf("Connected to MQTT broker with base topic: %s", c.cfg.BaseTopic)
+		log.Printf("Connected to MQTT broker with base topic: %s, publish mode %s", c.cfg.BaseTopic, c.cfg.PublishMode)
 		topicSet := c.topic("set/+")
 		tokenSet := cl.Subscribe(topicSet, c.cfg.QoS, c.onMessage)
 		tokenSet.Wait()
@@ -104,10 +119,6 @@ func (c *Controller) Run(ctx context.Context) error {
 	ticker := time.NewTicker(c.cfg.PublishInterval)
 	defer ticker.Stop()
 
-	var last thermostat.Snapshot
-	first := true
-
-	// publish immediately once
 	c.publishSnapshot()
 
 	for {
@@ -117,11 +128,8 @@ func (c *Controller) Run(ctx context.Context) error {
 			return ctx.Err()
 
 		case <-ticker.C:
-			cur := c.svc.Get()
-			if first || !reflect.DeepEqual(cur, last) {
+			if c.cfg.PublishMode == PublishInterval {
 				c.publishSnapshot()
-				last = cur
-				first = false
 			}
 		}
 	}
@@ -137,7 +145,9 @@ func (c *Controller) publishSnapshot() {
 		Mode:                   s.Mode.String(),
 		FanSpeed:               s.FanSpeed.String(),
 		AmbientTemperature:     s.AmbientTemperature,
+		DeviceId:               c.cfg.DeviceID,
 	}
+
 	b, _ := json.Marshal(dto)
 	c.client.Publish(c.topic("snapshot"), c.cfg.QoS, c.cfg.RetainSnapshot, b)
 }
@@ -150,6 +160,7 @@ type snapshotDTO struct {
 	Mode                   string  `json:"mode"`
 	FanSpeed               string  `json:"fan_speed"`
 	AmbientTemperature     float64 `json:"ambient_temperature"`
+	DeviceId               string  `json:"device_id"`
 }
 
 // Command payload format: {"value": ...}

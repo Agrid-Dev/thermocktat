@@ -12,6 +12,7 @@ func TestEnvKeyTransform_TopLevel(t *testing.T) {
 		{"ADDR", "addr"},
 		{"", ""},
 		{"   ", ""},
+		{"CONTROLLERS_MQTT_PUBLISH_MODE", "controllers.mqtt.publish_mode"},
 	}
 
 	for _, tt := range tests {
