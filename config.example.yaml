@@ -26,8 +26,8 @@ thermostat:
 regulator:
   enabled: true
   interval: 1s
-  kp: 0.1
-  ki: 0.01
-  kd: 0.05
+  kp: 0.00001
+  ki: 0.00001
+  kd: 0.01
   mode_change_hysteresis: 2.0
   target_hysteresis: 1.0

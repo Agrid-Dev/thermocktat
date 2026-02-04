@@ -31,9 +31,12 @@ The regulation of ambient temperature is simulated using a [PID regulator](https
 
 Regulation simulates the effect of heating or cooling systems controlled by the thermostat that will actually heat and cool the room in order to reach the desired temperature (setpoint).
 
-This example is for the heating mode. If the ambient temperature is above setpoint, or below within a hysteresis range (- `TriggerHysteresis`, 1°C in this example), heating is not triggered. When it is lower with a difference greater than the trigger hysteresis, heating start until the target temperature is reached. The target is the setpoint temperature plus a target hysteresis (0.5°C here).
+This example is for the heating mode. If the ambient temperature is above setpoint, or below within a hysteresis range (- `TargetHysteresis`, 1°C in this example), heating is not triggered. When it is lower with a difference greater than the target hysteresis, heating start until the target temperature is reached. The target is the setpoint temperature plus the target hysteresis.
 
-The reason for having 2 different hysteresis values is to avoid infinite loops in the `auto` mode. Otherwise, reaching target temperature after heating would immediately trigger cooling down to the lower hysteresis bound, which would again trigger heating, and so on. This is why `TargetHysteresis` must always be lower than `TriggerHysteresis`. 
+In `auto` mode, a second hysteresis `ModeChangeHysteresis` (greater than `TargetHysteresis`) can trigger switching regulation direction between cooling and heating. For example, if the `TargetHysteresis` is 1 and the `ModeChangeHysteresis` is 2 (default values):
+
+- if temperature setpoint is 20, and ambient temperature is above 22 (`setpoint + ModeChangeHysteresis`), regulation will switch to cooling, and cool until 19 (`setpoint - TargetHysteresis`);
+- if temperature setpoint is 20, and ambient temperature is below 18 (`setpoint - ModeChangeHysteresis`), regulation will switch to heating, and cool until 21 (`setpoint + TargetHysteresis`).
 
 Regulation params can be set in the `config.yaml` file (see `config.example.yaml`). Regulation can also be disabled (in this case, ambient temperature will remain constant).
 
