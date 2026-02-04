@@ -4,13 +4,13 @@ controllers:
     enabled: true
     addr: ":8080"
   mqtt:
-    enabled: true
-    broker_url: "tcp://host.docker.internal:1883"
+    enabled: false
+    addr: "tcp://host.docker.internal:1883"
     qos: 0
-    retain_snapshot: true
-    publish_interval: 1s
+    retain_snapshot: false
+    publish_interval: 5s
   modbus:
-    enabled: true
+    enabled: false
     addr: "localhost:1502"
     unit_id: 4
 

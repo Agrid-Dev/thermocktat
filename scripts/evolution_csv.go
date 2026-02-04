@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
@@ -90,7 +91,7 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 			}
 
 			// Update ambient temperature
-			thermostat.UpdateAmbientTemperature()
+			thermostat.UpdateAmbientTemperature(time.Second)
 
 		}
 	}

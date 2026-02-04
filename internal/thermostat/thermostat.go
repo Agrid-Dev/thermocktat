@@ -133,7 +133,7 @@ func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			t.UpdateAmbientTemperature()
+			t.UpdateAmbientTemperature(interval)
 		}
 	}
 }

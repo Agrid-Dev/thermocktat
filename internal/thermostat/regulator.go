@@ -1,5 +1,7 @@
 package thermostat
 
+import "time"
+
 type PIDRegulatorParams struct {
 	Kp                float64
 	Ki                float64
@@ -64,15 +66,15 @@ func (pid *PIDRegulator) GetTarget(setpoint, ambient float64, mode Mode) float64
 	return setpoint
 }
 
-func (pid *PIDRegulator) Update(setpoint, ambient float64, mode Mode) float64 {
+func (pid *PIDRegulator) Update(setpoint, ambient float64, mode Mode, dt time.Duration) float64 {
 	pid.Activate(setpoint, ambient, mode)
 	target := pid.GetTarget(setpoint, ambient, mode)
 	error := target - ambient
 
 	// Apply PID control if heating or cooling
 	if pid.isHeating || pid.isCooling {
-		pid.integral += error
-		derivative := error - pid.prevError
+		pid.integral += error * dt.Seconds()
+		derivative := (error - pid.prevError) / dt.Seconds()
 		pid.prevError = error
 
 		output := pid.params.Kp*error + pid.params.Ki*pid.integral + pid.params.Kd*derivative
@@ -82,9 +84,9 @@ func (pid *PIDRegulator) Update(setpoint, ambient float64, mode Mode) float64 {
 	return ambient
 }
 
-func (t *Thermostat) UpdateAmbientTemperature() {
+func (t *Thermostat) UpdateAmbientTemperature(dt time.Duration) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.s.AmbientTemperature = t.reg.Update(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode)
+	t.s.AmbientTemperature = t.reg.Update(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
 }

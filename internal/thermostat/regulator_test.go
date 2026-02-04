@@ -3,6 +3,7 @@ package thermostat
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func testValidatePIDRegulatorParams(t *testing.T) {
@@ -201,7 +202,7 @@ func TestPIDRegulatorStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regulator := NewPIDRegulator(params)
-			got := regulator.Update(tt.setpoint, tt.ambient, tt.mode)
+			got := regulator.Update(tt.setpoint, tt.ambient, tt.mode, time.Second)
 			if !almostEqual(got, tt.want, tt.tolerance) {
 				t.Errorf("PIDRegulator.Update() = %v, want %v", got, tt.want)
 			}
@@ -227,7 +228,7 @@ func TestPidRegulatorHeating(t *testing.T) {
 	maxIterations := 1000
 
 	for ambient < setpoint+params.TargetHysteresis && iterations < maxIterations {
-		newAmbient := regulator.Update(setpoint, ambient, ModeHeat)
+		newAmbient := regulator.Update(setpoint, ambient, ModeHeat, time.Second)
 		if newAmbient < ambient {
 			t.Errorf("Ambient temperature should not decrease when heating, have %f < %f (iteration %d)", newAmbient, ambient, iterations)
 			break
@@ -275,7 +276,7 @@ func TestThermostatUpdateAmbientTemperature(t *testing.T) {
 		t.Fatalf("Failed to create thermostat: %v", err)
 	}
 
-	thermostat.UpdateAmbientTemperature()
+	thermostat.UpdateAmbientTemperature(time.Second)
 	got := thermostat.Get().AmbientTemperature
 	want := 20.4
 	tolerance := 0.1
