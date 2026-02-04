@@ -1,0 +1,71 @@
+name: Integration Tests
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        working-directory: integration
+        run: uv sync --locked --all-groups
+
+      - name: Run Ruff check
+        working-directory: integration
+        run: uv run ruff check .
+
+      - name: Run Ruff format check
+        working-directory: integration
+        run: uv run ruff format --check .
+
+      - name: Run type check
+        working-directory: integration
+        run: uv run ty check
+
+  tests:
+    runs-on: ubuntu-latest
+    needs: quality
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build thermocktat
+        run: |
+          mkdir -p integration/.bin
+          go build -o integration/.bin/thermocktat ./cmd/thermocktat
+
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        working-directory: integration
+        run: uv sync --locked --all-groups
+
+      - name: Run tests
+        working-directory: integration
+        run: uv run pytest
