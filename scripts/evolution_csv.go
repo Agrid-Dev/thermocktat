@@ -28,11 +28,11 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 	}
 
 	pidParams := thermostat.PIDRegulatorParams{
-		Kp:                0.000005,
-		Ki:                0.00001,
-		Kd:                0.000025,
-		TriggerHysteresis: 1.0,
-		TargetHysteresis:  0.5,
+		Kp:                   0.000005,
+		Ki:                   0.00001,
+		Kd:                   0.000025,
+		ModeChangeHysteresis: 1.0,
+		TargetHysteresis:     0.5,
 	}
 
 	thermostat, err := thermostat.New(initial, pidParams)
@@ -82,8 +82,8 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 				fmt.Sprintf("%d", i+1),
 				fmt.Sprintf("%.2f", snapshot.AmbientTemperature),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint),
-				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.TriggerHysteresis),
-				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.TriggerHysteresis),
+				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.ModeChangeHysteresis),
+				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.ModeChangeHysteresis),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.TargetHysteresis),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.TargetHysteresis),
 			}); err != nil {

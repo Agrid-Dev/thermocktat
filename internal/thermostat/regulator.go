@@ -1,17 +1,19 @@
 package thermostat
 
-import "time"
+import (
+	"time"
+)
 
 type PIDRegulatorParams struct {
-	Kp                float64
-	Ki                float64
-	Kd                float64
-	TriggerHysteresis float64 // hysteresis for heating / cooling start
-	TargetHysteresis  float64 // hysteresis for heating / cooling stop (target reached)
+	Kp                   float64
+	Ki                   float64
+	Kd                   float64
+	TargetHysteresis     float64 // hysteresis for regulation within a mode (target reached)
+	ModeChangeHysteresis float64 // hysteresis for mode switch in auto mode (> TargetHysteresis)
 }
 
 func (params *PIDRegulatorParams) Validate() error {
-	if params.TargetHysteresis > params.TriggerHysteresis {
+	if !(params.ModeChangeHysteresis > params.TargetHysteresis) {
 		return ErrInvalidRegulatorHysteresis
 	}
 	if params.Kp < 0 || params.Ki < 0 || params.Kd < 0 {
@@ -34,26 +36,60 @@ func NewPIDRegulator(params PIDRegulatorParams) *PIDRegulator {
 	}
 }
 
-func (pid *PIDRegulator) Activate(setpoint, ambient float64, mode Mode) {
-	if mode == ModeFan {
-		pid.isCooling = false
-		pid.isHeating = false
+func (pid *PIDRegulator) setActivation(heating, cooling bool) {
+	if pid.isHeating == heating && pid.isCooling == cooling {
 		return
 	}
-	if (mode == ModeHeat || mode == ModeAuto) && ambient < setpoint-pid.params.TriggerHysteresis && !pid.isHeating {
-		pid.isHeating = true
-		pid.isCooling = false
-	} else if (mode == ModeCool || mode == ModeAuto) && ambient > setpoint+pid.params.TriggerHysteresis && !pid.isCooling {
-		pid.isCooling = true
-		pid.isHeating = false
-	}
-	// Check if we need to stop heating or cooling (target reached)
-	if pid.isHeating && ambient >= setpoint+pid.params.TargetHysteresis {
-		pid.isHeating = false
-	} else if pid.isCooling && ambient <= setpoint-pid.params.TargetHysteresis {
-		pid.isCooling = false
+	// Reset integrator and derivative memory on state change to avoid windup
+	pid.integral = 0
+	pid.prevError = 0
+	pid.isHeating = heating
+	pid.isCooling = cooling
+}
+
+func (pid *PIDRegulator) Activate(setpoint, ambient float64, mode Mode) {
+	// Precompute commonly used thresholds
+	lowTarget := setpoint - pid.params.TargetHysteresis
+	highTarget := setpoint + pid.params.TargetHysteresis
+	lowModeChange := setpoint - pid.params.ModeChangeHysteresis
+	highModeChange := setpoint + pid.params.ModeChangeHysteresis
+
+	// Fan mode turns everything off
+	if mode == ModeFan {
+		pid.setActivation(false, false)
+		return
 	}
 
+	// Explicit Heat or Cool modes
+	switch mode {
+	case ModeHeat:
+		if ambient < lowTarget {
+			pid.setActivation(true, false)
+			return
+		}
+	case ModeCool:
+		if ambient > highTarget {
+			pid.setActivation(false, true)
+			return
+		}
+	case ModeAuto:
+		// Possibly switch based on mode-change hysteresis
+		if ambient > highModeChange {
+			pid.setActivation(false, true)
+			return
+		}
+		if ambient < lowModeChange {
+			pid.setActivation(true, false)
+			return
+		}
+	}
+
+	// Stop heating/cooling when the target is reached (target hysteresis)
+	if pid.isHeating && ambient >= highTarget {
+		pid.setActivation(false, false)
+	} else if pid.isCooling && ambient <= lowTarget {
+		pid.setActivation(false, false)
+	}
 }
 
 func (pid *PIDRegulator) GetTarget(setpoint, ambient float64, mode Mode) float64 {

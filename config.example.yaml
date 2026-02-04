@@ -29,5 +29,5 @@ regulator:
   kp: 0.1
   ki: 0.01
   kd: 0.05
-  trigger_hysteresis: 1
-  target_hysteresis: 0.5
+  mode_change_hysteresis: 2.0
+  target_hysteresis: 1.0
