@@ -8,6 +8,6 @@ var (
 	ErrInvalidSetpoint                = errors.New("invalid temperature setpoint")
 	ErrInvalidMinMax                  = errors.New("invalid min/max setpoints")
 	ErrSetpointOutOfRange             = errors.New("setpoint out of range")
-	ErrInvalidRegulatorHysteresis     = errors.New("Trigger hysteresis must be strictly greater than Target hysteresis")
+	ErrInvalidRegulatorHysteresis     = errors.New("Mode Change hysteresis must be strictly greater than Target hysteresis")
 	ErrorInvalidRegulatorCoefficients = errors.New("Regulation PID coefficients must be greater or equal to zero")
 )

@@ -50,13 +50,13 @@ type ThermostatConfig struct {
 }
 
 type RegulatorConfig struct {
-	Enabled           bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
-	Interval          time.Duration `koanf:"interval" json:"interval" yaml:"interval"`
-	Kp                float64       `koanf:"p" json:"p" yaml:"p"`
-	Ki                float64       `koanf:"i" json:"i" yaml:"i"`
-	Kd                float64       `koanf:"d" json:"d" yaml:"d"`
-	TriggerHysteresis float64       `koanf:"trigger_hysteresis" json:"trigger_hysteresis" yaml:"trigger_hysteresis"`
-	TargetHysteresis  float64       `koanf:"target_hysteresis" json:"target_hysteresis" yaml:"target_hysteresis"`
+	Enabled              bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Interval             time.Duration `koanf:"interval" json:"interval" yaml:"interval"`
+	Kp                   float64       `koanf:"p" json:"p" yaml:"p"`
+	Ki                   float64       `koanf:"i" json:"i" yaml:"i"`
+	Kd                   float64       `koanf:"d" json:"d" yaml:"d"`
+	TargetHysteresis     float64       `koanf:"target_hysteresis" json:"target_hysteresis" yaml:"target_hysteresis"`
+	ModeChangeHysteresis float64       `koanf:"mode_change_hysteresis" json:"mode_change_hysteresis" yaml:"mode_change_hysteresis"`
 }
 
 type HTTPConfig struct {
@@ -172,7 +172,7 @@ func LoadConfig(path string) (Config, error) {
 // - TMK_CONTROLLERS_HTTP_ADDR              -> controllers.http.addr
 // - TMK_CONTROLLERS_MQTT_PUBLISH_INTERVAL  -> controllers.mqtt.publish_interval
 // - TMK_THERMOSTAT_TEMPERATURE_SETPOINT    -> thermostat.temperature_setpoint
-// - TMK_REGULATOR_TRIGGER_HYSTERESIS       -> regulator.trigger_hysteresis
+// - TMK_REGULATOR_MODE_CHANGE_HYSTERESIS       -> regulator.mode_change_hysteresis
 func envKeyTransform(k string) string {
 	// k is the env var name without the prefix "TMK_"
 	key := strings.ToLower(strings.TrimSpace(k))
@@ -339,11 +339,11 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 
 func (c Config) RegulatorParams() (thermostat.PIDRegulatorParams, error) {
 	params := thermostat.PIDRegulatorParams{
-		Kp:                c.Regulator.Kp,
-		Ki:                c.Regulator.Ki,
-		Kd:                c.Regulator.Kd,
-		TriggerHysteresis: c.Regulator.TriggerHysteresis,
-		TargetHysteresis:  c.Regulator.TargetHysteresis,
+		Kp:                   c.Regulator.Kp,
+		Ki:                   c.Regulator.Ki,
+		Kd:                   c.Regulator.Kd,
+		TargetHysteresis:     c.Regulator.TargetHysteresis,
+		ModeChangeHysteresis: c.Regulator.ModeChangeHysteresis,
 	}
 	if err := params.Validate(); err != nil {
 		return thermostat.PIDRegulatorParams{}, err

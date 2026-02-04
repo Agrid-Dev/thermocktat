@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
@@ -21,17 +22,17 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 		TemperatureSetpoint:    20.0,
 		TemperatureSetpointMin: 15.0,
 		TemperatureSetpointMax: 30.0,
-		Mode:                   thermostat.ModeAuto,
+		Mode:                   thermostat.ModeHeat,
 		FanSpeed:               thermostat.FanAuto,
 		AmbientTemperature:     20.0,
 	}
 
 	pidParams := thermostat.PIDRegulatorParams{
-		Kp:                0.000005,
-		Ki:                0.00001,
-		Kd:                0.000025,
-		TriggerHysteresis: 1.0,
-		TargetHysteresis:  0.5,
+		Kp:                   0.00001,
+		Ki:                   0.00001,
+		Kd:                   0.01,
+		ModeChangeHysteresis: 2.0,
+		TargetHysteresis:     1.0,
 	}
 
 	thermostat, err := thermostat.New(initial, pidParams)
@@ -50,7 +51,7 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 	defer writer.Flush()
 
 	// Write CSV header
-	if err := writer.Write([]string{"Iteration", "Ambient", "Setpoint", "TriggerHistLow", "TriggerHistHigh", "TargetHistLow", "TargetHistHigh"}); err != nil {
+	if err := writer.Write([]string{"Iteration", "Ambient", "Setpoint", "ModeChangeLow", "ModeChangeHigh", "TargetLow", "TargetHigh"}); err != nil {
 		return fmt.Errorf("failed to write CSV header: %v", err)
 	}
 
@@ -81,8 +82,8 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 				fmt.Sprintf("%d", i+1),
 				fmt.Sprintf("%.2f", snapshot.AmbientTemperature),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint),
-				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.TriggerHysteresis),
-				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.TriggerHysteresis),
+				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.ModeChangeHysteresis),
+				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.ModeChangeHysteresis),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint-pidParams.TargetHysteresis),
 				fmt.Sprintf("%.2f", snapshot.TemperatureSetpoint+pidParams.TargetHysteresis),
 			}); err != nil {
@@ -90,7 +91,7 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 			}
 
 			// Update ambient temperature
-			thermostat.UpdateAmbientTemperature()
+			thermostat.UpdateAmbientTemperature(time.Second)
 
 		}
 	}
