@@ -22,8 +22,7 @@ def mqtt_client():
         client.disconnect()
 
 
-@pytest.mark.parametrize("tmk_application", ["mqtt"], indirect=True)
-def test_connects_to_broker(tmk_application, mqtt_client):
+def test_connects_to_broker(mqtt_tmk_application, mqtt_client):
     assert True
 
 
@@ -46,8 +45,7 @@ def _get_snapshot(mqtt_client, base_topic: str) -> dict | None:
     return payload
 
 
-@pytest.mark.parametrize("tmk_application", ["mqtt"], indirect=True)
-def test_get_snapshot(tmk_application, mqtt_client):
+def test_get_snapshot(mqtt_tmk_application, mqtt_client):
     snapshot = _get_snapshot(mqtt_client, BASE_TOPIC)
     assert snapshot is not None
     assert snapshot["device_id"] == "default"
@@ -56,9 +54,8 @@ def test_get_snapshot(tmk_application, mqtt_client):
     assert snapshot["mode"] in modes
 
 
-@pytest.mark.parametrize("tmk_application", ["mqtt"], indirect=True)
 @pytest.mark.parametrize("value", [True, False])
-def test_set_enabled(tmk_application, mqtt_client, value):
+def test_set_enabled(mqtt_tmk_application, mqtt_client, value):
     mqtt_client.publish(
         f"{BASE_TOPIC}/set/enabled", json.dumps({"value": value}).encode()
     )
@@ -67,8 +64,7 @@ def test_set_enabled(tmk_application, mqtt_client, value):
     assert snapshot["enabled"] is value
 
 
-@pytest.mark.parametrize("tmk_application", ["mqtt"], indirect=True)
-def test_write_temperature_setpoint(tmk_application, mqtt_client):
+def test_write_temperature_setpoint(mqtt_tmk_application, mqtt_client):
     setpoint = 20.0
     mqtt_client.publish(
         f"{BASE_TOPIC}/set/temperature_setpoint",
@@ -79,9 +75,8 @@ def test_write_temperature_setpoint(tmk_application, mqtt_client):
     assert snapshot["temperature_setpoint"] == setpoint
 
 
-@pytest.mark.parametrize("tmk_application", ["mqtt"], indirect=True)
 @pytest.mark.parametrize("mode", modes)
-def test_write_mode(tmk_application, mqtt_client, mode):
+def test_write_mode(mqtt_tmk_application, mqtt_client, mode):
     mqtt_client.publish(
         f"{BASE_TOPIC}/set/mode",
         json.dumps({"value": mode}).encode(),
