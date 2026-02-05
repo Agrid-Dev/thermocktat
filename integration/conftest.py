@@ -6,15 +6,17 @@ import pytest
 
 
 @pytest.fixture(scope="module")
-def tmk_application():
-    """Fixture to start the TMK application before tests and stop it after tests."""
+def tmk_application(request):
+    enabled = set(getattr(request, "param", ("http", "modbus")))
+
     env = os.environ.copy()
-    # Enable HTTP controller
-    env["TMK_CONTROLLERS_HTTP_ENABLED"] = "true"
+
+    # HTTP controller
+    env["TMK_CONTROLLERS_HTTP_ENABLED"] = "true" if "http" in enabled else "false"
     env["TMK_CONTROLLERS_HTTP_ADDR"] = ":8080"
 
-    # Enable Modbus controller
-    env["TMK_CONTROLLERS_MODBUS_ENABLED"] = "true"
+    # Modbus controller
+    env["TMK_CONTROLLERS_MODBUS_ENABLED"] = "true" if "modbus" in enabled else "false"
     env["TMK_CONTROLLERS_MODBUS_ADDR"] = "0.0.0.0:1502"
     env["TMK_CONTROLLERS_MODBUS_UNIT_ID"] = "4"
 
@@ -24,7 +26,7 @@ def tmk_application():
     process = subprocess.Popen(
         ["./.bin/thermocktat"], env=env, stdout=None, stderr=None
     )
-    time.sleep(2)
+    time.sleep(1)
     yield  # Tests will run after this point
 
     process.terminate()

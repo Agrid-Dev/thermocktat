@@ -19,6 +19,8 @@ IR_AMBIENT_TEMPERATURE = 0
 # Coil address
 COIL_ENABLED = 0
 
+DEVICE_ID = 4
+
 
 @pytest.fixture
 def modbus_client():
@@ -29,15 +31,16 @@ def modbus_client():
     client.close()
 
 
+@pytest.mark.parametrize("tmk_application", ["modbus"], indirect=True)
 def test_read_registers(tmk_application, modbus_client):
     """Read all Modbus registers and verify snapshot structure."""
     hr = modbus_client.read_holding_registers(
-        HR_TEMPERATURE_SETPOINT, count=5, device_id=4
+        HR_TEMPERATURE_SETPOINT, count=5, device_id=DEVICE_ID
     )
     ir = modbus_client.read_input_registers(
-        IR_AMBIENT_TEMPERATURE, count=1, device_id=4
+        IR_AMBIENT_TEMPERATURE, count=1, device_id=DEVICE_ID
     )
-    coil = modbus_client.read_coils(COIL_ENABLED, count=1, device_id=4)
+    coil = modbus_client.read_coils(COIL_ENABLED, count=1, device_id=DEVICE_ID)
 
     assert not hr.isError()
     assert not ir.isError()
@@ -65,34 +68,39 @@ def test_read_registers(tmk_application, modbus_client):
     assert isinstance(enabled, bool)
 
 
+@pytest.mark.parametrize("tmk_application", ["modbus"], indirect=True)
 @pytest.mark.parametrize("value", [True, False])
 def test_set_enabled(tmk_application, modbus_client, value):
-    modbus_client.write_coil(COIL_ENABLED, value, device_id=4)
+    modbus_client.write_coil(COIL_ENABLED, value, device_id=DEVICE_ID)
     time.sleep(0.2)
-    result = modbus_client.read_coils(COIL_ENABLED, count=1, device_id=4)
+    result = modbus_client.read_coils(COIL_ENABLED, count=1, device_id=DEVICE_ID)
     assert not result.isError()
     enabled = result.bits[0]
     assert enabled is value
 
 
+@pytest.mark.parametrize("tmk_application", ["modbus"], indirect=True)
 def test_write_temperature_setpoint(tmk_application, modbus_client):
     setpoint = 20.0
     setpoint_encoded = int(setpoint * 100)  # 2000
-    modbus_client.write_register(HR_TEMPERATURE_SETPOINT, setpoint_encoded, device_id=4)
+    modbus_client.write_register(
+        HR_TEMPERATURE_SETPOINT, setpoint_encoded, device_id=DEVICE_ID
+    )
     time.sleep(0.2)
     result = modbus_client.read_holding_registers(
-        HR_TEMPERATURE_SETPOINT, count=1, device_id=4
+        HR_TEMPERATURE_SETPOINT, count=1, device_id=DEVICE_ID
     )
     assert not result.isError()
     temperature_setpoint = result.registers[0]
     assert temperature_setpoint == setpoint_encoded
 
 
+@pytest.mark.parametrize("tmk_application", ["modbus"], indirect=True)
 @pytest.mark.parametrize("mode", modes)
 def test_write_mode(tmk_application, modbus_client, mode):
-    modbus_client.write_register(HR_MODE, mode, device_id=4)
+    modbus_client.write_register(HR_MODE, mode, device_id=DEVICE_ID)
     time.sleep(0.2)
-    result = modbus_client.read_holding_registers(HR_MODE, count=1, device_id=4)
+    result = modbus_client.read_holding_registers(HR_MODE, count=1, device_id=DEVICE_ID)
     assert not result.isError()
     read_mode = result.registers[0]
     assert read_mode == mode
