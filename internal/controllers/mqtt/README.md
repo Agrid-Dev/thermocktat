@@ -5,14 +5,12 @@
 Example:
 ```yaml
 controllers:
-  http:
-    enabled: true
-    addr: ":8080"
   mqtt:
     enabled: true
-    broker_url: "tcp://localhost:1883" # or "tcp://host.docker.internal:1883"
+    addr: "tcp://localhost:1883" # broker url, or "tcp://host.docker.internal:1883"
     qos: 0
-    retain_snapshot: true
+    retain_snapshot: true # have the broker retain last snapshot message
+    publish_mode: on_change # publish snapshot if changed. Use 'interval' to publish on every interval even if unchanged.
     publish_interval: 1s # will publish snapshot every interval (only if changed)
     base_topic: "room101" # optional : to override default base topic = thermocktat/{device_id}
     username: rubeus # if the broker requires authentication
