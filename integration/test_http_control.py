@@ -13,6 +13,7 @@ def http_client():
     return httpx.Client(base_url="http://localhost:8080")
 
 
+@pytest.mark.parametrize("tmk_application", ["http"], indirect=True)
 def test_healthz(tmk_application, http_client):
     response = http_client.get("/healthz")
     assert response.status_code == 200
@@ -28,6 +29,7 @@ def test_get_snapshot(tmk_application, http_client):
     assert snapshot["mode"] in modes
 
 
+@pytest.mark.parametrize("tmk_application", ["http"], indirect=True)
 @pytest.mark.parametrize("value", [True, False])
 def test_set_enabled(tmk_application, http_client, value):
     response = http_client.post("/v1/enabled", json={"value": value})
@@ -36,6 +38,7 @@ def test_set_enabled(tmk_application, http_client, value):
     assert snapshot["enabled"] is value
 
 
+@pytest.mark.parametrize("tmk_application", ["http"], indirect=True)
 def test_write_temperature_setpoint(tmk_application, http_client):
     setpoint = 20.0
     write_response = http_client.post(
@@ -46,6 +49,7 @@ def test_write_temperature_setpoint(tmk_application, http_client):
     assert snapshot["temperature_setpoint"] == setpoint
 
 
+@pytest.mark.parametrize("tmk_application", ["http"], indirect=True)
 @pytest.mark.parametrize("mode", modes)
 def test_write_mode(tmk_application, http_client, mode):
     write_response = http_client.post("/v1/mode", json={"value": mode})

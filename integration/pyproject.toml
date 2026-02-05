@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28.1",
+    "pymodbus>=3.11.4",
 ]
 
 [dependency-groups]
