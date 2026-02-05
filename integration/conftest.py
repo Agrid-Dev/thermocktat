@@ -1,37 +1,54 @@
 import os
 import subprocess
 import time
+from contextlib import contextmanager
+from typing import Literal
 
 import pytest
 
+ControllerType = Literal["http", "mqtt", "modbus"]
 
-@pytest.fixture(scope="module")
-def tmk_application(request):
-    enabled = set(getattr(request, "param", ("http", "modbus")))
 
+@contextmanager
+def tmk_application(controller: ControllerType, addr: str):
     env = os.environ.copy()
-
-    # HTTP controller
-    env["TMK_CONTROLLERS_HTTP_ENABLED"] = "true" if "http" in enabled else "false"
-    env["TMK_CONTROLLERS_HTTP_ADDR"] = ":8080"
-
-    # Modbus controller
-    env["TMK_CONTROLLERS_MODBUS_ENABLED"] = "true" if "modbus" in enabled else "false"
-    env["TMK_CONTROLLERS_MODBUS_ADDR"] = "0.0.0.0:1502"
-    env["TMK_CONTROLLERS_MODBUS_UNIT_ID"] = "4"
+    env["TMK_CONTROLLER"] = controller
+    env["TMK_ADDR"] = addr
 
     # Regulator settings
     env["TMK_REGULATOR_MODE_CHANGE_HYSTERESIS"] = "2.0"
     env["TMK_REGULATOR_TARGET_HYSTERESIS"] = "1.0"
+    print("starting process")
     process = subprocess.Popen(
         ["./.bin/thermocktat"], env=env, stdout=None, stderr=None
     )
-    time.sleep(1)
-    yield  # Tests will run after this point
-
-    process.terminate()
     try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+        # give the process a moment to start
+        time.sleep(1)
+        yield  # Tests will run while inside the context
+    finally:
+        print("terminating process")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
+@pytest.fixture(scope="module")
+def http_tmk_application():
+    with tmk_application(controller="http", addr=":8080"):
+        yield
+
+
+@pytest.fixture(scope="module")
+def modbus_tmk_application():
+    with tmk_application(controller="modbus", addr="0.0.0.0:1502"):
+        yield
+
+
+@pytest.fixture(scope="module")
+def mqtt_tmk_application():
+    with tmk_application(controller="mqtt", addr="localhost:1883"):
+        yield
