@@ -7,13 +7,17 @@ import pytest
 
 @pytest.fixture(scope="module")
 def tmk_application(request):
-    enabled = set(getattr(request, "param", ("http", "modbus")))
+    enabled = set(getattr(request, "param", ("http", "mqtt", "modbus")))
 
     env = os.environ.copy()
 
     # HTTP controller
     env["TMK_CONTROLLERS_HTTP_ENABLED"] = "true" if "http" in enabled else "false"
     env["TMK_CONTROLLERS_HTTP_ADDR"] = ":8080"
+
+    # MQTT controller
+    env["TMK_CONTROLLERS_MQTT_ENABLED"] = "true" if "mqtt" in enabled else "false"
+    env["TMK_CONTROLLERS_MQTT_ADDR"] = "tcp://localhost:1883"
 
     # Modbus controller
     env["TMK_CONTROLLERS_MODBUS_ENABLED"] = "true" if "modbus" in enabled else "false"
