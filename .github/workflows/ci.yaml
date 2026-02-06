@@ -90,6 +90,21 @@ jobs:
             uv run ruff format --check .
             uv run ty check
 
+        - name: Write mosquitto config (allow anonymous)
+          run: |
+            cat > /tmp/mosquitto.conf <<'EOF'
+            listener 1883 0.0.0.0
+            allow_anonymous true
+            persistence false
+            EOF
+
+        - name: Start Mosquitto Broker
+          run: |
+            docker run -d --name mosquitto \
+              -p 1883:1883 \
+              -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro \
+              eclipse-mosquitto:2.0
+
         - name: Download Binary
           uses: actions/download-artifact@v4
           with:
