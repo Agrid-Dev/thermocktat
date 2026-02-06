@@ -17,18 +17,24 @@ type Snapshot struct {
 }
 
 type Thermostat struct {
-	mu  sync.RWMutex
-	s   Snapshot
-	reg PIDRegulator
+	mu       sync.RWMutex
+	s        Snapshot
+	reg      PIDRegulator
+	heatLoss HeatLossSimulator
 }
 
-func New(initial Snapshot, pidParams PIDRegulatorParams) (*Thermostat, error) {
+func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams) (*Thermostat, error) {
 	t := &Thermostat{}
 	if err := validateSnapshot(initial); err != nil {
 		return nil, err
 	}
 	t.s = initial
 	t.reg = *NewPIDRegulator(pidParams)
+	heatLoss, err := NewHeatLossSimulator(heatLossParams)
+	if err != nil {
+		return nil, err
+	}
+	t.heatLoss = *heatLoss
 	return t, nil
 }
 
@@ -119,9 +125,17 @@ func (t *Thermostat) SetSetpoint(sp float64) error {
 
 // Internal: used by simulator
 func (t *Thermostat) setAmbient(temp float64) {
+	// lock held by caller
+	t.s.AmbientTemperature = temp
+}
+
+func (t *Thermostat) UpdateAmbient(dt time.Duration) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.s.AmbientTemperature = temp
+	deltaReg := t.reg.DeltaTemperature(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
+	deltaHeatLoss := t.heatLoss.DeltaTemperature(t.s.AmbientTemperature, dt)
+	newAmbient := t.s.AmbientTemperature + deltaReg + deltaHeatLoss
+	t.setAmbient(newAmbient)
 }
 
 func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {
@@ -133,7 +147,7 @@ func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			t.UpdateAmbientTemperature(interval)
+			t.UpdateAmbient(interval)
 		}
 	}
 }

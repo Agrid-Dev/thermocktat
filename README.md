@@ -40,6 +40,8 @@ In `auto` mode, a second hysteresis `ModeChangeHysteresis` (greater than `Target
 
 Regulation params can be set in the `config.yaml` file (see `config.example.yaml`). Regulation can also be disabled (in this case, ambient temperature will remain constant).
 
+Heat losses (or gains) through room walls are also simulated and simply modeled by a conduction coefficient. A temperature delta proportional to the difference between outdoor and ambient temperatures and to this coefficient is added to the ambient temperature every second. The heat loss coefficient represents the room's thermal condictivity (the higher the coefficient, the higher the loss). It can be configured in the `heat_loss` section of the config file (see `config.example.yaml`). Set to 0 for no heat loss.
+
 ## API Documentation
 - [HTTP Controller API](internal/controllers/http/README.md)
 - [MQTT Controller API](internal/controllers/mqtt/README.md)

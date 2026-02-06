@@ -10,4 +10,5 @@ var (
 	ErrSetpointOutOfRange             = errors.New("setpoint out of range")
 	ErrInvalidRegulatorHysteresis     = errors.New("Mode Change hysteresis must be strictly greater than Target hysteresis")
 	ErrorInvalidRegulatorCoefficients = errors.New("Regulation PID coefficients must be greater or equal to zero")
+	ErrNegativeHeatLossCoefficient    = errors.New("Heat loss coefficient must be greater or equal to zero")
 )

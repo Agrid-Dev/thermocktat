@@ -34,8 +34,12 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 		ModeChangeHysteresis: 2.0,
 		TargetHysteresis:     1.0,
 	}
+	heatLoss := thermostat.HeatLossSimulatorParams{
+		Coefficient:        1.e-4,
+		OutdoorTemperature: 10,
+	}
 
-	thermostat, err := thermostat.New(initial, pidParams)
+	thermostat, err := thermostat.New(initial, pidParams, heatLoss)
 	if err != nil {
 		return fmt.Errorf("failed to create thermostat: %v", err)
 	}
@@ -91,7 +95,7 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 			}
 
 			// Update ambient temperature
-			thermostat.UpdateAmbientTemperature(time.Second)
+			thermostat.UpdateAmbient(time.Second)
 
 		}
 	}

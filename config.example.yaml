@@ -29,5 +29,9 @@ regulator:
   kp: 0.00001
   ki: 0.00001
   kd: 0.01
-  mode_change_hysteresis: 2.0
+  mode_change_hysteresis: 2.0 # used for switching between heating and cooling in auto mode.
   target_hysteresis: 1.0
+
+heat_loss:
+  coefficient: 0.0001 # 0, represents conductivity. 0 for no loss.
+  outdoor_temperature: 10

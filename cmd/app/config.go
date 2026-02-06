@@ -35,6 +35,7 @@ type Config struct {
 
 	Thermostat ThermostatConfig `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
 	Regulator  RegulatorConfig  `koanf:"regulator" json:"regulator" yaml:"regulator"`
+	HeatLoss   HeatLossConfig   `koanf:"heat_loss" json:"heat_loss" yaml:"heat_loss"`
 }
 
 type ThermostatConfig struct {
@@ -57,6 +58,11 @@ type RegulatorConfig struct {
 	Kd                   float64       `koanf:"d" json:"d" yaml:"d"`
 	TargetHysteresis     float64       `koanf:"target_hysteresis" json:"target_hysteresis" yaml:"target_hysteresis"`
 	ModeChangeHysteresis float64       `koanf:"mode_change_hysteresis" json:"mode_change_hysteresis" yaml:"mode_change_hysteresis"`
+}
+
+type HeatLossConfig struct {
+	Coefficient        float64 `koanf:"coefficient" json:"coefficient" yaml:"coefficient"`
+	OutdoorTemperature float64 `koanf:"outdoor_temperature" json:"outdoor_temperature" yaml:"outdoor_temperature"`
 }
 
 type HTTPConfig struct {
@@ -211,6 +217,14 @@ func envKeyTransform(k string) string {
 		field := strings.Join(parts[1:], "_")
 		return "regulator." + field
 
+	case "heat": // heat_loss config
+		// heat_loss_<field...> -> heat_loss.<field_with_underscores>
+		if len(parts) < 2 {
+			return key
+		}
+		field := strings.Join(parts[2:], "_")
+		return "heat_loss." + field
+
 	default:
 		// top-level keys keep underscores (device_id, controller, addr, etc.)
 		return key
@@ -347,6 +361,17 @@ func (c Config) RegulatorParams() (thermostat.PIDRegulatorParams, error) {
 	}
 	if err := params.Validate(); err != nil {
 		return thermostat.PIDRegulatorParams{}, err
+	}
+	return params, nil
+}
+
+func (c Config) HeatLossParams() (thermostat.HeatLossSimulatorParams, error) {
+	params := thermostat.HeatLossSimulatorParams{
+		Coefficient:        c.HeatLoss.Coefficient,
+		OutdoorTemperature: c.HeatLoss.OutdoorTemperature,
+	}
+	if err := params.Validate(); err != nil {
+		return thermostat.HeatLossSimulatorParams{}, err
 	}
 	return params, nil
 }

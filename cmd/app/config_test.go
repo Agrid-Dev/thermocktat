@@ -12,7 +12,6 @@ func TestEnvKeyTransform_TopLevel(t *testing.T) {
 		{"ADDR", "addr"},
 		{"", ""},
 		{"   ", ""},
-		{"CONTROLLERS_MQTT_PUBLISH_MODE", "controllers.mqtt.publish_mode"},
 	}
 
 	for _, tt := range tests {
@@ -34,6 +33,7 @@ func TestEnvKeyTransform_Controllers(t *testing.T) {
 		{"CONTROLLERS_HTTP", "controllers_http"},   // not enough parts -> fallback
 		{"CONTROLLERS__ADDR", "controllers..addr"}, // edge case
 		{"controllers_HTTP_addr", "controllers.http.addr"},
+		{"CONTROLLERS_MQTT_PUBLISH_MODE", "controllers.mqtt.publish_mode"},
 	}
 
 	for _, tt := range tests {
@@ -55,6 +55,8 @@ func TestEnvKeyTransform_ThermostatAndRegulator(t *testing.T) {
 		{"REGULATOR_TRIGGER_HYSTERESIS", "regulator.trigger_hysteresis"},
 		{"THERMOSTAT", "thermostat"}, // not enough parts -> passthrough
 		{"REGULATOR", "regulator"},   // not enough parts -> passthrough
+		{"HEAT_LOSS_COEFFICIENT", "heat_loss.coefficient"},
+		{"HEAT_LOSS_OUTDOOR_TEMPERATURE", "heat_loss.outdoor_temperature"},
 	}
 
 	for _, tt := range tests {
