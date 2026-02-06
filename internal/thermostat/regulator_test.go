@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func testValidatePIDRegulatorParams(t *testing.T) {
+func TestValidatePIDRegulatorParams(t *testing.T) {
 	paramsOk := PIDRegulatorParams{
 		Kp:                   0.1,
 		Ki:                   0.01,
@@ -191,24 +191,24 @@ func TestPIDRegulatorStart(t *testing.T) {
 		want      float64
 		tolerance float64
 	}{
-		{"HeatModeReg", 25.0, 20.0, ModeHeat, 20.88, approx}, // outside hysteresis : start regulating
-		{"CoolModeReg", 20.0, 25.0, ModeCool, 24.12, approx},
-		{"FanModeReg", 25.0, 20.0, ModeFan, 20.0, approx},
-		{"FanModeReg", 20.0, 25.0, ModeFan, 25.0, approx},
-		{"AutoModeRegHeat", 25.0, 20.0, ModeAuto, 20.88, approx},
-		{"AutoModeRegCool", 20.0, 25.0, ModeAuto, 24.12, approx},
-		{"HeatModeRegWithinHysteresisUp", 20.0, 20.5, ModeHeat, 20.5, exact}, // within hysteresis : no regulation
-		{"HeatModeRegWithinHysteresisDown", 20.0, 19.5, ModeHeat, 19.5, exact},
-		{"CoolModeRegWithinHysteresisUp", 20.0, 20.5, ModeCool, 20.5, exact},
-		{"CoolModeRegWithinHysteresisDown", 20.0, 19.5, ModeCool, 19.5, exact},
-		{"AutoModeRegWithinHysteresisUp", 20.0, 20.4, ModeAuto, 20.4, exact},
-		{"AutoModeRegWithinHysteresisDown", 20.0, 19.6, ModeAuto, 19.6, exact},
+		{"HeatModeReg", 25.0, 20.0, ModeHeat, 0.88, approx}, // outside hysteresis : start regulating
+		{"CoolModeReg", 20.0, 25.0, ModeCool, -0.88, approx},
+		{"FanModeReg", 25.0, 20.0, ModeFan, 0, exact},
+		{"FanModeReg", 20.0, 25.0, ModeFan, 0, exact},
+		{"AutoModeRegHeat", 25.0, 20.0, ModeAuto, 0.88, approx},
+		{"AutoModeRegCool", 20.0, 25.0, ModeAuto, -0.88, approx},
+		{"HeatModeRegWithinHysteresisUp", 20.0, 20.5, ModeHeat, 0, exact}, // within hysteresis : no regulation
+		{"HeatModeRegWithinHysteresisDown", 20.0, 19.5, ModeHeat, 0, exact},
+		{"CoolModeRegWithinHysteresisUp", 20.0, 20.5, ModeCool, 0, exact},
+		{"CoolModeRegWithinHysteresisDown", 20.0, 19.5, ModeCool, 0, exact},
+		{"AutoModeRegWithinHysteresisUp", 20.0, 20.4, ModeAuto, 0, exact},
+		{"AutoModeRegWithinHysteresisDown", 20.0, 19.6, ModeAuto, 0, exact},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regulator := NewPIDRegulator(params)
-			got := regulator.Update(tt.setpoint, tt.ambient, tt.mode, time.Second)
+			got := regulator.DeltaTemperature(tt.setpoint, tt.ambient, tt.mode, time.Second)
 			if !almostEqual(got, tt.want, tt.tolerance) {
 				t.Errorf("PIDRegulator.Update() = %v, want %v", got, tt.want)
 			}
@@ -234,9 +234,9 @@ func TestPidRegulatorHeating(t *testing.T) {
 	maxIterations := 1000
 
 	for ambient < setpoint+params.TargetHysteresis && iterations < maxIterations {
-		newAmbient := regulator.Update(setpoint, ambient, ModeHeat, time.Second)
-		if newAmbient < ambient {
-			t.Errorf("Ambient temperature should not decrease when heating, have %f < %f (iteration %d)", newAmbient, ambient, iterations)
+		delta := regulator.DeltaTemperature(setpoint, ambient, ModeHeat, time.Second)
+		if delta < 0 {
+			t.Errorf("Ambient temperature should not decrease when heating, have delta %f < 0 (iteration %d)", delta, iterations)
 			break
 		}
 		if !regulator.isHeating {
@@ -247,7 +247,7 @@ func TestPidRegulatorHeating(t *testing.T) {
 			t.Errorf("Regulator should not be cooling")
 			break
 		}
-		ambient = newAmbient
+		ambient = ambient + delta
 		iterations++
 	}
 	if iterations == maxIterations {
@@ -258,36 +258,4 @@ func TestPidRegulatorHeating(t *testing.T) {
 		t.Errorf("Regulator should be done heating after reaching setpoint + targetHysteresis")
 	}
 
-}
-
-func TestThermostatUpdateAmbientTemperature(t *testing.T) {
-	initial := Snapshot{
-		Enabled:                true,
-		TemperatureSetpoint:    22.5,
-		Mode:                   ModeHeat,
-		AmbientTemperature:     20.0,
-		TemperatureSetpointMin: 18.0,
-		TemperatureSetpointMax: 27.0,
-		FanSpeed:               FanAuto,
-	}
-	params := PIDRegulatorParams{
-		Kp:                   0.1,
-		Ki:                   0.01,
-		Kd:                   0.05,
-		ModeChangeHysteresis: 1.0,
-		TargetHysteresis:     0.5,
-	}
-	thermostat, err := New(initial, params)
-	if err != nil {
-		t.Fatalf("Failed to create thermostat: %v", err)
-	}
-
-	thermostat.UpdateAmbientTemperature(time.Second)
-	got := thermostat.Get().AmbientTemperature
-	want := 20.4
-	tolerance := 0.1
-
-	if !almostEqual(got, want, tolerance) {
-		t.Errorf("Thermostat.UpdateAmbientTemperature() = %v, want %v", got, want)
-	}
 }

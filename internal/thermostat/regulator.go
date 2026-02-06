@@ -102,7 +102,7 @@ func (pid *PIDRegulator) GetTarget(setpoint, ambient float64, mode Mode) float64
 	return setpoint
 }
 
-func (pid *PIDRegulator) Update(setpoint, ambient float64, mode Mode, dt time.Duration) float64 {
+func (pid *PIDRegulator) DeltaTemperature(setpoint, ambient float64, mode Mode, dt time.Duration) float64 {
 	pid.Activate(setpoint, ambient, mode)
 	target := pid.GetTarget(setpoint, ambient, mode)
 	error := target - ambient
@@ -114,15 +114,8 @@ func (pid *PIDRegulator) Update(setpoint, ambient float64, mode Mode, dt time.Du
 		pid.prevError = error
 
 		output := pid.params.Kp*error + pid.params.Ki*pid.integral + pid.params.Kd*derivative
-		return ambient + output
+		return output
 	}
 
-	return ambient
-}
-
-func (t *Thermostat) UpdateAmbientTemperature(dt time.Duration) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.s.AmbientTemperature = t.reg.Update(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
+	return 0
 }

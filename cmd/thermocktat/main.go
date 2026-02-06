@@ -33,7 +33,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	th, err := thermostat.New(snap, regulatorParams)
+	heatLossParams, err := cfg.HeatLossParams()
+	if err != nil {
+		log.Fatal(err)
+	}
+	th, err := thermostat.New(snap, regulatorParams, heatLossParams)
 	if err != nil {
 		log.Fatal(err)
 	}
