@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestEnvKeyTransform_TopLevel(t *testing.T) {
 	tests := []struct {
@@ -64,5 +67,37 @@ func TestEnvKeyTransform_ThermostatAndRegulator(t *testing.T) {
 		if got != tt.want {
 			t.Fatalf("envKeyTransform(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestLoadConfigEmbeddedDefaults(t *testing.T) {
+	config, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig() = %v, want nil", err)
+	}
+	if !config.Controllers.HTTP.Enabled {
+		t.Fatalf("LoadConfig() = %v, want true", config.Controllers.HTTP.Enabled)
+	}
+	defaultHttpAddr := ":8080" // (from config.example.yaml)
+	if config.Controllers.HTTP.Addr != defaultHttpAddr {
+		t.Fatalf("LoadConfig() = %v, want %v", config.Controllers.HTTP.Addr, defaultHttpAddr)
+	}
+}
+
+func TestLoadConfigEnvVarOverride(t *testing.T) {
+	varName := "TMK_CONTROLLERS_HTTP_ADDR"
+	os.Setenv(varName, ":8081")
+	defer os.Unsetenv(varName)
+
+	config, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig() = %v, want nil", err)
+	}
+	if !config.Controllers.HTTP.Enabled {
+		t.Fatalf("LoadConfig() = %v, want true", config.Controllers.HTTP.Enabled)
+	}
+	expectedHttpAddr := ":8081"
+	if config.Controllers.HTTP.Addr != expectedHttpAddr {
+		t.Fatalf("LoadConfig() = %v, want %v", config.Controllers.HTTP.Addr, expectedHttpAddr)
 	}
 }

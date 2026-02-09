@@ -5,13 +5,14 @@ import paho.mqtt.client as mqtt
 import pytest
 
 modes = ["heat", "cool", "fan", "auto"]
-BASE_TOPIC = "thermocktat/default"
+DEVICE_ID = "my-thermocktat"  # from config_default.yaml
+BASE_TOPIC = f"thermocktat/{DEVICE_ID}"
 
 
 @pytest.fixture
 def mqtt_client():
     """MQTT client connected to the local broker, with network loop running."""
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client()
     # Match the broker URL used in the app config: tcp://localhost:1883
     client.connect("localhost", 1883, keepalive=60)
     client.loop_start()
@@ -48,7 +49,7 @@ def _get_snapshot(mqtt_client, base_topic: str) -> dict | None:
 def test_get_snapshot(mqtt_tmk_application, mqtt_client):
     snapshot = _get_snapshot(mqtt_client, BASE_TOPIC)
     assert snapshot is not None
-    assert snapshot["device_id"] == "default"
+    assert snapshot["device_id"] == DEVICE_ID
     assert isinstance(snapshot["temperature_setpoint"], (int, float))
     assert isinstance(snapshot["enabled"], bool)
     assert snapshot["mode"] in modes

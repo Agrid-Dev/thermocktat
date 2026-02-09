@@ -12,6 +12,7 @@ require (
 	github.com/knadh/koanf/providers/structs v1.0.0
 	github.com/knadh/koanf/v2 v2.3.2
 	github.com/tbrandon/mbserver v0.0.0-20231208015628-36eb59221ac2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
