@@ -38,9 +38,9 @@ In `auto` mode, a second hysteresis `ModeChangeHysteresis` (greater than `Target
 - if temperature setpoint is 20, and ambient temperature is above 22 (`setpoint + ModeChangeHysteresis`), regulation will switch to cooling, and cool until 19 (`setpoint - TargetHysteresis`);
 - if temperature setpoint is 20, and ambient temperature is below 18 (`setpoint - ModeChangeHysteresis`), regulation will switch to heating, and cool until 21 (`setpoint + TargetHysteresis`).
 
-Regulation params can be set in the `config.yaml` file (see `config.example.yaml`). Regulation can also be disabled (in this case, ambient temperature will remain constant).
+Regulation params can be set in the `config.yaml` file (see `cmd/app/config_defaults.yaml`). Regulation can also be disabled (in this case, ambient temperature will remain constant).
 
-Heat losses (or gains) through room walls are also simulated and simply modeled by a conduction coefficient. A temperature delta proportional to the difference between outdoor and ambient temperatures and to this coefficient is added to the ambient temperature every second. The heat loss coefficient represents the room's thermal condictivity (the higher the coefficient, the higher the loss). It can be configured in the `heat_loss` section of the config file (see `config.example.yaml`). Set to 0 for no heat loss.
+Heat losses (or gains) through room walls are also simulated and simply modeled by a conduction coefficient. A temperature delta proportional to the difference between outdoor and ambient temperatures and to this coefficient is added to the ambient temperature every second. The heat loss coefficient represents the room's thermal condictivity (the higher the coefficient, the higher the loss). It can be configured in the `heat_loss` section of the config file (see `cmd/app/config_defaults.yaml`). Set to 0 for no heat loss.
 
 ## API Documentation
 - [HTTP Controller API](internal/controllers/http/README.md)
@@ -52,7 +52,7 @@ Heat losses (or gains) through room walls are also simulated and simply modeled 
 
 ## Configuration
 
-Thermocktat can be configured from a file (see `config.example.yaml`).
+Thermocktat can be configured from a file (see `cmd/app/config_defaults.yaml`).
 
 Usage:
 ```sh
@@ -61,7 +61,7 @@ go run ./cmd/thermocktat -config config.yaml
 
 Configuration can also be passed using environment variables with the `TMK_` prefix. **Environment variables have priority over config file**.
 
-If no config is provided, default values will be used (@TODO: values from `config.example.yaml`).
+If no config is provided, default values will be used (values from `cmd/app/config_defaults.yaml`).
 
 For each controller, the `addr` field is in the format `host:port` (`host` will be `localhost` by default). For most controllers, it is used to set the url that the server will expose. For `mqtt`, `addr` is the address of the broker.
 
