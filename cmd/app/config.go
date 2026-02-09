@@ -1,12 +1,15 @@
 package app
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	gyaml "gopkg.in/yaml.v3"
 
 	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/yaml"
@@ -17,6 +20,9 @@ import (
 
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
+
+//go:embed config_defaults.yaml
+var exampleConfigYAML []byte
 
 type Config struct {
 	DeviceID string `koanf:"device_id" json:"device_id" yaml:"device_id"`
@@ -90,29 +96,19 @@ type Modbusconfig struct {
 	SyncInterval time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
 }
 
-func DefaultConfig() Config {
-	var cfg Config
-
-	cfg.DeviceID = "default"
-
-	cfg.Controllers.HTTP.Addr = ":8080"
-	cfg.Controllers.MQTT.PublishInterval = 1 * time.Second
-	cfg.Controllers.MODBUS.UnitID = 1
-
-	cfg.Regulator.Kp = 0.1
-	cfg.Regulator.Ki = 0.01
-	cfg.Regulator.Kd = 0.05
-	cfg.Regulator.Interval = 1 * time.Second
-
-	return cfg
-}
-
 func LoadConfig(path string) (Config, error) {
 	k := koanf.New(".")
 
-	// 1) Defaults
-	if err := k.Load(structs.Provider(DefaultConfig(), "koanf"), nil); err != nil {
-		return Config{}, fmt.Errorf("load defaults: %w", err)
+	// 1) Defaults - require embedded example YAML
+	if len(exampleConfigYAML) == 0 {
+		return Config{}, fmt.Errorf("embedded default config is missing")
+	}
+	var embeddedCfg Config
+	if err := gyaml.Unmarshal(exampleConfigYAML, &embeddedCfg); err != nil {
+		return Config{}, fmt.Errorf("failed to parse embedded default config: %w", err)
+	}
+	if err := k.Load(structs.Provider(embeddedCfg, "koanf"), nil); err != nil {
+		return Config{}, fmt.Errorf("load embedded defaults: %w", err)
 	}
 
 	// 2) Optional file layer
