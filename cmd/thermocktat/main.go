@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/Agrid-Dev/thermocktat/cmd/app"
+	bacnetctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/bacnet"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
 	modbusctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/modbus"
 	mqttctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/mqtt"
@@ -109,6 +110,25 @@ func main() {
 			log.Printf("modbus controller listening to %s with UnitID %d", cfg.Controllers.MODBUS.Addr, cfg.Controllers.MODBUS.UnitID)
 			if err := mc.Run(ctx); err != nil && err != context.Canceled {
 				log.Printf("modbus controller exited: %v", err)
+				cancel()
+			}
+		}()
+	}
+
+	if cfg.Controllers.BACNET.Enabled {
+		bc, err := bacnetctrl.New(th, bacnetctrl.Config{
+			DeviceID:       deviceID,
+			Addr:           cfg.Controllers.BACNET.Addr,
+			DeviceInstance: cfg.Controllers.BACNET.DeviceInstance,
+			SyncInterval:   cfg.Controllers.BACNET.SyncInterval,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() {
+			log.Printf("bacnet controller listening to %s with DeviceInstance %d", cfg.Controllers.BACNET.Addr, cfg.Controllers.BACNET.DeviceInstance)
+			if err := bc.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("bacnet controller exited: %v", err)
 				cancel()
 			}
 		}()
