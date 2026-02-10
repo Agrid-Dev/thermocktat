@@ -37,6 +37,7 @@ type Config struct {
 		HTTP   HTTPConfig   `koanf:"http" json:"http" yaml:"http"`
 		MQTT   MQTTConfig   `koanf:"mqtt" json:"mqtt" yaml:"mqtt"`
 		MODBUS Modbusconfig `koanf:"modbus" json:"modbus" yaml:"modbus"`
+		BACNET BacnetConfig `koanf:"bacnet" json:"bacnet" yaml:"bacnet"`
 	} `koanf:"controllers" json:"controllers" yaml:"controllers"`
 
 	Thermostat ThermostatConfig `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
@@ -95,6 +96,13 @@ type Modbusconfig struct {
 	UnitID        byte          `koanf:"unit_id" json:"unit_id" yaml:"unit_id"`
 	SyncInterval  time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
 	RegisterCount int           `koanf:"register_count" json:"register_count" yaml:"register_count"` // 1 or 2 (registers per float value)
+}
+
+type BacnetConfig struct {
+	Enabled        bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Addr           string        `koanf:"addr" json:"addr" yaml:"addr"`
+	SyncInterval   time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
+	DeviceInstance int           `koanf:"device_instance" json:"device_instance" yaml:"device_instance"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -235,6 +243,7 @@ func normalize(cfg *Config) {
 		cfg.Controllers.HTTP.Enabled = false
 		cfg.Controllers.MQTT.Enabled = false
 		cfg.Controllers.MODBUS.Enabled = false
+		cfg.Controllers.BACNET.Enabled = false
 
 		switch c {
 		case "http":
@@ -252,6 +261,11 @@ func normalize(cfg *Config) {
 			if cfg.Addr != "" {
 				cfg.Controllers.MODBUS.Addr = cfg.Addr
 			}
+		case "bacnet":
+			cfg.Controllers.BACNET.Enabled = true
+			if cfg.Addr != "" {
+				cfg.Controllers.BACNET.Addr = cfg.Addr
+			}
 		}
 	}
 
@@ -266,9 +280,9 @@ func normalize(cfg *Config) {
 func validate(cfg Config) error {
 	if cfg.Controller != "" {
 		switch strings.ToLower(strings.TrimSpace(cfg.Controller)) {
-		case "http", "mqtt", "modbus":
+		case "http", "mqtt", "modbus", "bacnet":
 		default:
-			return fmt.Errorf("invalid controller %q (expected http|mqtt|modbus)", cfg.Controller)
+			return fmt.Errorf("invalid controller %q (expected http|mqtt|modbus|bacnet)", cfg.Controller)
 		}
 	}
 
