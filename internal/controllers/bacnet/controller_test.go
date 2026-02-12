@@ -3,6 +3,7 @@ package bacnetctrl
 import (
 	"context"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -109,6 +110,67 @@ func TestWhoIs_IAm(t *testing.T) {
 
 	// done
 	cancel()
+}
+
+// testThermostatService is a more complete stub for testing ReadProperty/WriteProperty
+type testThermostatService struct {
+	mu       sync.Mutex
+	snapshot thermostat.Snapshot
+}
+
+func newTestThermostatService() *testThermostatService {
+	return &testThermostatService{
+		snapshot: thermostat.Snapshot{
+			Enabled:                true,
+			TemperatureSetpoint:    22.0,
+			TemperatureSetpointMin: 16.0,
+			TemperatureSetpointMax: 28.0,
+			Mode:                   thermostat.ModeAuto,
+			FanSpeed:               thermostat.FanAuto,
+			AmbientTemperature:     21.0,
+		},
+	}
+}
+
+func (s *testThermostatService) Get() thermostat.Snapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.snapshot
+}
+
+func (s *testThermostatService) SetEnabled(v bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.Enabled = v
+}
+
+func (s *testThermostatService) SetSetpoint(v float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.TemperatureSetpoint = v
+	return nil
+}
+
+func (s *testThermostatService) SetMinMax(min, max float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.TemperatureSetpointMin = min
+	s.snapshot.TemperatureSetpointMax = max
+	return nil
+}
+
+func (s *testThermostatService) SetMode(m thermostat.Mode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.Mode = m
+	return nil
+}
+
+func (s *testThermostatService) SetFanSpeed(f thermostat.FanSpeed) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshot.FanSpeed = f
+	return nil
 }
 
 // Minimal stub implementing ports.ThermostatService for test (WhoIs doesn't use the service).
