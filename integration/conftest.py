@@ -10,7 +10,9 @@ ControllerType = Literal["http", "mqtt", "modbus"]
 
 
 @contextmanager
-def tmk_application(controller: ControllerType, addr: str):
+def tmk_application(
+    controller: ControllerType, addr: str, extra_env: dict | None = None
+):
     env = os.environ.copy()
     env["TMK_CONTROLLER"] = controller
     env["TMK_ADDR"] = addr
@@ -18,7 +20,10 @@ def tmk_application(controller: ControllerType, addr: str):
     # Regulator settings
     env["TMK_REGULATOR_MODE_CHANGE_HYSTERESIS"] = "2.0"
     env["TMK_REGULATOR_TARGET_HYSTERESIS"] = "1.0"
-    print("starting process")
+
+    if extra_env:
+        env.update(extra_env)
+
     process = subprocess.Popen(
         ["./.bin/thermocktat"], env=env, stdout=None, stderr=None
     )
@@ -45,6 +50,16 @@ def http_tmk_application():
 @pytest.fixture(scope="module")
 def modbus_tmk_application():
     with tmk_application(controller="modbus", addr="0.0.0.0:1502"):
+        yield
+
+
+@pytest.fixture(scope="module")
+def modbus_tmk_application_32bit():
+    with tmk_application(
+        controller="modbus",
+        addr="0.0.0.0:1503",
+        extra_env={"TMK_CONTROLLERS_MODBUS_REGISTER_COUNT": "2"},
+    ):
         yield
 
 
