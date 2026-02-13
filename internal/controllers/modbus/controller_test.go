@@ -2,6 +2,7 @@ package modbusctrl
 
 import (
 	"encoding/binary"
+	"math"
 	"net"
 	"sync"
 	"testing"
@@ -116,33 +117,53 @@ func TestModbusControllerHandlers(t *testing.T) {
 	defer handler.Close()
 	client := modbus.NewClient(handler)
 
-	// Read holding registers 0..4
-	res, err := client.ReadHoldingRegisters(0, 5)
+	// Read holding registers 0..9 (hrTotal=10)
+	res, err := client.ReadHoldingRegisters(0, 10)
 	if err != nil {
 		t.Fatalf("read holding: %v", err)
 	}
-	if len(res) != 10 {
-		t.Fatalf("expected 10 bytes got %d", len(res))
+	if len(res) != 20 {
+		t.Fatalf("expected 20 bytes got %d", len(res))
 	}
 	get := func(i int) uint16 { return binary.BigEndian.Uint16(res[i*2 : i*2+2]) }
-	if get(0) != encodeTemp(fs.s.TemperatureSetpoint) {
-		t.Fatalf("setpoint mismatch")
+	if get(hrSetpoint) != encodeTemp(fs.s.TemperatureSetpoint) {
+		t.Fatalf("setpoint mismatch: got %d want %d", get(hrSetpoint), encodeTemp(fs.s.TemperatureSetpoint))
 	}
-	if get(3) != uint16(fs.s.Mode) {
+	if get(hrSetpointMin) != encodeTemp(fs.s.TemperatureSetpointMin) {
+		t.Fatalf("setpoint_min mismatch")
+	}
+	if get(hrSetpointMax) != encodeTemp(fs.s.TemperatureSetpointMax) {
+		t.Fatalf("setpoint_max mismatch")
+	}
+	if get(hrMode) != uint16(fs.s.Mode) {
 		t.Fatalf("mode mismatch")
 	}
+	if get(hrFanSpeed) != uint16(fs.s.FanSpeed) {
+		t.Fatalf("fan_speed mismatch")
+	}
 
-	// Write setpoint register
+	// Write setpoint via function 6 (register address hrSetpoint=0)
 	newSP := encodeTemp(25.75)
-	if _, err := client.WriteSingleRegister(0, newSP); err != nil {
+	if _, err := client.WriteSingleRegister(hrSetpoint, newSP); err != nil {
 		t.Fatalf("write register: %v", err)
 	}
-	// allow sync to run
 	time.Sleep(SyncInterval)
 	fs.mu.Lock()
 	if len(fs.setSetpointCalls) == 0 || fs.setSetpointCalls[len(fs.setSetpointCalls)-1] != decodeTemp(newSP) {
 		fs.mu.Unlock()
 		t.Fatalf("setSetpoint not called")
+	}
+	fs.mu.Unlock()
+
+	// Write mode via function 6 (register address hrMode=6)
+	if _, err := client.WriteSingleRegister(hrMode, uint16(thermostat.ModeHeat)); err != nil {
+		t.Fatalf("write mode: %v", err)
+	}
+	time.Sleep(SyncInterval)
+	fs.mu.Lock()
+	if len(fs.setModeCalls) == 0 || fs.setModeCalls[len(fs.setModeCalls)-1] != thermostat.ModeHeat {
+		fs.mu.Unlock()
+		t.Fatalf("setMode not called")
 	}
 	fs.mu.Unlock()
 
@@ -157,4 +178,131 @@ func TestModbusControllerHandlers(t *testing.T) {
 		t.Fatalf("setEnabled not called")
 	}
 	fs.mu.Unlock()
+
+	// Read input registers (ambient temperature)
+	irRes, err := client.ReadInputRegisters(irAmbient, 1)
+	if err != nil {
+		t.Fatalf("read input registers: %v", err)
+	}
+	if len(irRes) != 2 {
+		t.Fatalf("expected 2 bytes got %d", len(irRes))
+	}
+	irVal := binary.BigEndian.Uint16(irRes[0:2])
+	if irVal != encodeTemp(fs.s.AmbientTemperature) {
+		t.Fatalf("ambient temp mismatch: got %d want %d", irVal, encodeTemp(fs.s.AmbientTemperature))
+	}
+}
+
+func TestModbusController32Bit(t *testing.T) {
+	fs := &spyThermostatService{}
+	fs.s = thermostat.Snapshot{
+		Enabled:                true,
+		TemperatureSetpoint:    22.5,
+		TemperatureSetpointMin: 16.0,
+		TemperatureSetpointMax: 28.0,
+		Mode:                   thermostat.ModeAuto,
+		FanSpeed:               thermostat.FanAuto,
+		AmbientTemperature:     21.25,
+	}
+
+	addr := findFreeTCPAddr(t)
+
+	ctrl, err := New(fs, Config{
+		DeviceID:      "dev",
+		Addr:          addr,
+		UnitID:        1,
+		SyncInterval:  SyncInterval,
+		RegisterCount: 2,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx := t.Context()
+	go func() {
+		_ = ctrl.Run(ctx)
+	}()
+
+	time.Sleep(SyncInterval)
+
+	handler := modbus.NewTCPClientHandler(addr)
+	if err := handler.Connect(); err != nil {
+		t.Fatalf("client connect: %v", err)
+	}
+	defer handler.Close()
+	client := modbus.NewClient(handler)
+
+	// Read all holding registers
+	res, err := client.ReadHoldingRegisters(0, 10)
+	if err != nil {
+		t.Fatalf("read holding: %v", err)
+	}
+	if len(res) != 20 {
+		t.Fatalf("expected 20 bytes got %d", len(res))
+	}
+	get := func(i int) uint16 { return binary.BigEndian.Uint16(res[i*2 : i*2+2]) }
+
+	// Verify setpoint is encoded as float32 across 2 registers
+	spBits := uint32(get(hrSetpoint))<<16 | uint32(get(hrSetpoint+1))
+	spFloat := math.Float32frombits(spBits)
+	if spFloat != float32(22.5) {
+		t.Fatalf("32-bit setpoint mismatch: got %f want %f", spFloat, float32(22.5))
+	}
+
+	// Mode should still be plain uint16
+	if get(hrMode) != uint16(thermostat.ModeAuto) {
+		t.Fatalf("mode mismatch: got %d want %d", get(hrMode), uint16(thermostat.ModeAuto))
+	}
+
+	// Function 6 (write single register) should fail for temperature addresses in 32-bit mode
+	if _, err := client.WriteSingleRegister(hrSetpoint, 2000); err == nil {
+		t.Fatalf("expected error writing single temp register in 32-bit mode")
+	}
+
+	// Function 6 should still work for mode
+	if _, err := client.WriteSingleRegister(hrMode, uint16(thermostat.ModeCool)); err != nil {
+		t.Fatalf("write mode in 32-bit mode: %v", err)
+	}
+	time.Sleep(SyncInterval)
+	fs.mu.Lock()
+	if len(fs.setModeCalls) == 0 || fs.setModeCalls[len(fs.setModeCalls)-1] != thermostat.ModeCool {
+		fs.mu.Unlock()
+		t.Fatalf("setMode not called correctly")
+	}
+	fs.mu.Unlock()
+
+	// Write temperature via function 16 (write multiple registers) with float32 encoding
+	newSP := float32(25.75)
+	spU32 := math.Float32bits(newSP)
+	writeData := make([]byte, 4)
+	binary.BigEndian.PutUint16(writeData[0:2], uint16(spU32>>16))
+	binary.BigEndian.PutUint16(writeData[2:4], uint16(spU32&0xFFFF))
+	if _, err := client.WriteMultipleRegisters(hrSetpoint, 2, writeData); err != nil {
+		t.Fatalf("write multiple registers: %v", err)
+	}
+	time.Sleep(SyncInterval)
+	fs.mu.Lock()
+	if len(fs.setSetpointCalls) == 0 {
+		fs.mu.Unlock()
+		t.Fatalf("setSetpoint not called")
+	}
+	gotSP := fs.setSetpointCalls[len(fs.setSetpointCalls)-1]
+	fs.mu.Unlock()
+	if math.Abs(gotSP-float64(newSP)) > 0.001 {
+		t.Fatalf("setSetpoint value mismatch: got %f want %f", gotSP, newSP)
+	}
+
+	// Read input registers in 32-bit mode (2 registers for ambient temp)
+	irRes, err := client.ReadInputRegisters(irAmbient, 2)
+	if err != nil {
+		t.Fatalf("read input registers: %v", err)
+	}
+	if len(irRes) != 4 {
+		t.Fatalf("expected 4 bytes got %d", len(irRes))
+	}
+	ambBits := uint32(binary.BigEndian.Uint16(irRes[0:2]))<<16 | uint32(binary.BigEndian.Uint16(irRes[2:4]))
+	ambFloat := math.Float32frombits(ambBits)
+	if ambFloat != float32(21.25) {
+		t.Fatalf("32-bit ambient mismatch: got %f want %f", ambFloat, float32(21.25))
+	}
 }

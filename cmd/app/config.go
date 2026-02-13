@@ -90,10 +90,11 @@ type MQTTConfig struct {
 }
 
 type Modbusconfig struct {
-	Enabled      bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
-	Addr         string        `koanf:"addr" json:"addr" yaml:"addr"`
-	UnitID       byte          `koanf:"unit_id" json:"unit_id" yaml:"unit_id"`
-	SyncInterval time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
+	Enabled       bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
+	Addr          string        `koanf:"addr" json:"addr" yaml:"addr"`
+	UnitID        byte          `koanf:"unit_id" json:"unit_id" yaml:"unit_id"`
+	SyncInterval  time.Duration `koanf:"sync_interval" json:"sync_interval" yaml:"sync_interval"`
+	RegisterCount int           `koanf:"register_count" json:"register_count" yaml:"register_count"` // 1 or 2 (registers per float value)
 }
 
 func LoadConfig(path string) (Config, error) {

@@ -20,8 +20,22 @@ type Config struct {
 	Addr     string
 	UnitID   byte // UnitID (Modbus slave/unit ID). Use an integer 1..247.
 	// SyncInterval retained in config to preserve API but unused when reads are handled by custom handlers.
-	SyncInterval time.Duration
+	SyncInterval  time.Duration
+	RegisterCount int // 1 = 16-bit (int16*100), 2 = 32-bit (IEEE 754 float32 across 2 registers)
 }
+
+// Holding register base addresses (spaced by 2 so each can hold up to 2 registers in 32-bit mode).
+const (
+	hrSetpoint    = 0
+	hrSetpointMin = 2
+	hrSetpointMax = 4
+	hrMode        = 6
+	hrFanSpeed    = 8
+	hrTotal       = 10 // register space size
+
+	irAmbient = 0
+	irTotal   = 2
+)
 
 type Controller struct {
 	svc ports.ThermostatService
@@ -37,8 +51,35 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:1502"
 	}
-	// SyncInterval is optional; no polling is required because reads are handled directly.
+	if cfg.RegisterCount == 0 {
+		cfg.RegisterCount = 1
+	}
+	if cfg.RegisterCount != 1 && cfg.RegisterCount != 2 {
+		return nil, fmt.Errorf("modbus: RegisterCount must be 1 or 2, got %d", cfg.RegisterCount)
+	}
 	return &Controller{svc: svc, cfg: cfg}, nil
+}
+
+// encodeTempToRegs encodes a temperature float64 into a pair of uint16 registers.
+// In 16-bit mode (RegisterCount=1), hi = int16*100, lo = 0.
+// In 32-bit mode (RegisterCount=2), the pair is the big-endian IEEE 754 float32 split across two registers.
+func (c *Controller) encodeTempToRegs(v float64) (hi, lo uint16) {
+	if c.cfg.RegisterCount == 2 {
+		u := math.Float32bits(float32(v))
+		hi = uint16(u >> 16)
+		lo = uint16(u & 0xFFFF)
+		return hi, lo
+	}
+	return encodeTemp(v), 0
+}
+
+// decodeTempFromRegs decodes a temperature from a pair of uint16 registers.
+func (c *Controller) decodeTempFromRegs(hi, lo uint16) float64 {
+	if c.cfg.RegisterCount == 2 {
+		u := uint32(hi)<<16 | uint32(lo)
+		return float64(math.Float32frombits(u))
+	}
+	return decodeTemp(hi)
 }
 
 // Run starts the Modbus server and registers handlers that apply writes immediately and
@@ -73,7 +114,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		return []byte{1, coilByte}, &mbserver.Success
 	})
 
-	// Read Holding Registers (function 3) - expose HR 0..4 from service snapshot.
+	// Read Holding Registers (function 3) - expose HR 0..hrTotal-1 from service snapshot.
 	serv.RegisterFunctionHandler(3, func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
 		data := frame.GetData()
 		if len(data) < 4 {
@@ -84,35 +125,25 @@ func (c *Controller) Run(ctx context.Context) error {
 		if qty == 0 || qty > 125 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
-		// We support addresses 0..4
-		if start < 0 || start+qty > 5 {
+		if start < 0 || start+qty > hrTotal {
 			return []byte{}, &mbserver.IllegalDataAddress
 		}
 		snap := c.svc.Get()
-		// Build response: byte count + register bytes
-		regs := make([]uint16, 0, qty)
-		for i := 0; i < qty; i++ {
-			addr := start + i
-			switch addr {
-			case 0:
-				regs = append(regs, encodeTemp(snap.TemperatureSetpoint))
-			case 1:
-				regs = append(regs, encodeTemp(snap.TemperatureSetpointMin))
-			case 2:
-				regs = append(regs, encodeTemp(snap.TemperatureSetpointMax))
-			case 3:
-				regs = append(regs, uint16(snap.Mode))
-			case 4:
-				regs = append(regs, uint16(snap.FanSpeed))
-			default:
-				return []byte{}, &mbserver.IllegalDataAddress
-			}
-		}
-		byteCount := len(regs) * 2
+
+		// Build full register map
+		var regs [hrTotal]uint16
+		regs[hrSetpoint], regs[hrSetpoint+1] = c.encodeTempToRegs(snap.TemperatureSetpoint)
+		regs[hrSetpointMin], regs[hrSetpointMin+1] = c.encodeTempToRegs(snap.TemperatureSetpointMin)
+		regs[hrSetpointMax], regs[hrSetpointMax+1] = c.encodeTempToRegs(snap.TemperatureSetpointMax)
+		regs[hrMode] = uint16(snap.Mode)
+		regs[hrFanSpeed] = uint16(snap.FanSpeed)
+
+		// Serve the requested slice
+		byteCount := qty * 2
 		resp := make([]byte, 1+byteCount)
 		resp[0] = byte(byteCount)
-		for i, r := range regs {
-			binary.BigEndian.PutUint16(resp[1+i*2:1+i*2+2], r)
+		for i := 0; i < qty; i++ {
+			binary.BigEndian.PutUint16(resp[1+i*2:1+i*2+2], regs[start+i])
 		}
 		return resp, &mbserver.Success
 	})
@@ -128,18 +159,20 @@ func (c *Controller) Run(ctx context.Context) error {
 		if qty == 0 || qty > 125 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
-		if start < 0 || start+qty > 1 {
+		if start < 0 || start+qty > irTotal {
 			return []byte{}, &mbserver.IllegalDataAddress
 		}
 		snap := c.svc.Get()
-		// Only IR 0 is present
-		if qty != 1 || start != 0 {
-			return []byte{}, &mbserver.IllegalDataAddress
+
+		var regs [irTotal]uint16
+		regs[irAmbient], regs[irAmbient+1] = c.encodeTempToRegs(snap.AmbientTemperature)
+
+		byteCount := qty * 2
+		resp := make([]byte, 1+byteCount)
+		resp[0] = byte(byteCount)
+		for i := 0; i < qty; i++ {
+			binary.BigEndian.PutUint16(resp[1+i*2:1+i*2+2], regs[start+i])
 		}
-		val := encodeTemp(snap.AmbientTemperature)
-		resp := make([]byte, 1+2)
-		resp[0] = 2
-		binary.BigEndian.PutUint16(resp[1:3], val)
 		return resp, &mbserver.Success
 	})
 
@@ -184,25 +217,34 @@ func (c *Controller) Run(ctx context.Context) error {
 		value := binary.BigEndian.Uint16(data[2:4])
 
 		switch addr {
-		case 0:
+		case hrSetpoint:
+			if c.cfg.RegisterCount == 2 {
+				return []byte{}, &mbserver.IllegalDataAddress
+			}
 			if err := c.svc.SetSetpoint(decodeTemp(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
-		case 1:
+		case hrSetpointMin:
+			if c.cfg.RegisterCount == 2 {
+				return []byte{}, &mbserver.IllegalDataAddress
+			}
 			cur := c.svc.Get()
 			if err := c.svc.SetMinMax(decodeTemp(value), cur.TemperatureSetpointMax); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
-		case 2:
+		case hrSetpointMax:
+			if c.cfg.RegisterCount == 2 {
+				return []byte{}, &mbserver.IllegalDataAddress
+			}
 			cur := c.svc.Get()
 			if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, decodeTemp(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
-		case 3:
+		case hrMode:
 			if err := c.svc.SetMode(thermostat.Mode(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
-		case 4:
+		case hrFanSpeed:
 			if err := c.svc.SetFanSpeed(thermostat.FanSpeed(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
@@ -221,46 +263,69 @@ func (c *Controller) Run(ctx context.Context) error {
 		if len(d) < 5 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
-		start := binary.BigEndian.Uint16(d[0:2])
-		quantity := binary.BigEndian.Uint16(d[2:4])
+		start := int(binary.BigEndian.Uint16(d[0:2]))
+		quantity := int(binary.BigEndian.Uint16(d[2:4]))
 		byteCount := int(d[4])
-		if byteCount != int(quantity)*2 || len(d) < 5+byteCount {
+		if byteCount != quantity*2 || len(d) < 5+byteCount {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
-		for i := 0; i < int(quantity); i++ {
-			addr := int(start) + i
-			val := binary.BigEndian.Uint16(d[5+i*2 : 5+i*2+2])
+
+		// Helper to read register value at position in the data payload.
+		regAt := func(pos int) uint16 {
+			return binary.BigEndian.Uint16(d[5+pos*2 : 5+pos*2+2])
+		}
+
+		// Walk through the written range, consuming 1 or 2 registers per logical field.
+		pos := 0
+		for pos < quantity {
+			addr := start + pos
 			switch addr {
-			case 0:
-				if err := c.svc.SetSetpoint(decodeTemp(val)); err != nil {
+			case hrSetpoint, hrSetpointMin, hrSetpointMax:
+				var temp float64
+				if c.cfg.RegisterCount == 2 {
+					if pos+2 > quantity {
+						return []byte{}, &mbserver.IllegalDataValue
+					}
+					temp = c.decodeTempFromRegs(regAt(pos), regAt(pos+1))
+					pos += 2
+				} else {
+					temp = decodeTemp(regAt(pos))
+					pos++
+				}
+				switch addr {
+				case hrSetpoint:
+					if err := c.svc.SetSetpoint(temp); err != nil {
+						return []byte{}, &mbserver.IllegalDataValue
+					}
+				case hrSetpointMin:
+					cur := c.svc.Get()
+					if err := c.svc.SetMinMax(temp, cur.TemperatureSetpointMax); err != nil {
+						return []byte{}, &mbserver.IllegalDataValue
+					}
+				case hrSetpointMax:
+					cur := c.svc.Get()
+					if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, temp); err != nil {
+						return []byte{}, &mbserver.IllegalDataValue
+					}
+				}
+			case hrMode:
+				if err := c.svc.SetMode(thermostat.Mode(regAt(pos))); err != nil {
 					return []byte{}, &mbserver.IllegalDataValue
 				}
-			case 1:
-				cur := c.svc.Get()
-				if err := c.svc.SetMinMax(decodeTemp(val), cur.TemperatureSetpointMax); err != nil {
+				pos++
+			case hrFanSpeed:
+				if err := c.svc.SetFanSpeed(thermostat.FanSpeed(regAt(pos))); err != nil {
 					return []byte{}, &mbserver.IllegalDataValue
 				}
-			case 2:
-				cur := c.svc.Get()
-				if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, decodeTemp(val)); err != nil {
-					return []byte{}, &mbserver.IllegalDataValue
-				}
-			case 3:
-				if err := c.svc.SetMode(thermostat.Mode(val)); err != nil {
-					return []byte{}, &mbserver.IllegalDataValue
-				}
-			case 4:
-				if err := c.svc.SetFanSpeed(thermostat.FanSpeed(val)); err != nil {
-					return []byte{}, &mbserver.IllegalDataValue
-				}
+				pos++
 			default:
 				return []byte{}, &mbserver.IllegalDataAddress
 			}
 		}
 
 		resp := make([]byte, 4)
-		binary.BigEndian.PutUint16(resp[0:2], start)
-		binary.BigEndian.PutUint16(resp[2:4], quantity)
+		binary.BigEndian.PutUint16(resp[0:2], uint16(start))
+		binary.BigEndian.PutUint16(resp[2:4], uint16(quantity))
 		return resp, &mbserver.Success
 	})
 

@@ -97,10 +97,11 @@ func main() {
 	}
 	if cfg.Controllers.MODBUS.Enabled {
 		mc, err := modbusctrl.New(th, modbusctrl.Config{
-			DeviceID:     deviceID,
-			Addr:         cfg.Controllers.MODBUS.Addr,
-			UnitID:       cfg.Controllers.MODBUS.UnitID,
-			SyncInterval: cfg.Controllers.MODBUS.SyncInterval,
+			DeviceID:      deviceID,
+			Addr:          cfg.Controllers.MODBUS.Addr,
+			UnitID:        cfg.Controllers.MODBUS.UnitID,
+			SyncInterval:  cfg.Controllers.MODBUS.SyncInterval,
+			RegisterCount: cfg.Controllers.MODBUS.RegisterCount,
 		})
 		if err != nil {
 			log.Fatal(err)

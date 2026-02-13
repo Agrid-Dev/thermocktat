@@ -13,6 +13,7 @@ controllers:
     enabled: false
     addr: "localhost:1502"
     unit_id: 4
+    register_count: 1
 
 thermostat:
   enabled: true
