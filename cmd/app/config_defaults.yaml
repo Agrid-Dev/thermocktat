@@ -14,6 +14,11 @@ controllers:
     addr: "localhost:1502"
     unit_id: 4
     register_count: 1
+  bacnet:
+    enabled: false
+    addr: "0.0.0.0:47808"
+    device_instance: 1
+    sync_interval: 0.5s
 
 thermostat:
   enabled: true

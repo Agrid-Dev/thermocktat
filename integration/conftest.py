@@ -6,7 +6,7 @@ from typing import Literal
 
 import pytest
 
-ControllerType = Literal["http", "mqtt", "modbus"]
+ControllerType = Literal["http", "mqtt", "modbus", "bacnet"]
 
 
 @contextmanager
@@ -66,4 +66,10 @@ def modbus_tmk_application_32bit():
 @pytest.fixture(scope="module")
 def mqtt_tmk_application():
     with tmk_application(controller="mqtt", addr="localhost:1883"):
+        yield
+
+
+@pytest.fixture(scope="module")
+def bacnet_tmk_application():
+    with tmk_application(controller="bacnet", addr="127.0.0.1:47808"):
         yield
