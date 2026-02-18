@@ -51,7 +51,7 @@ jobs:
       - name: Build
         run: |
           mkdir -p .bin
-          go build -o .bin/thermocktat ./cmd/thermocktat/main.go
+          CGO_ENABLED=0 go build -o .bin/thermocktat ./cmd/thermocktat/main.go
 
       - name: Run tests (with coverage)
         run: |

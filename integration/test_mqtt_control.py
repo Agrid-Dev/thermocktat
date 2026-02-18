@@ -12,7 +12,7 @@ BASE_TOPIC = f"thermocktat/{DEVICE_ID}"
 @pytest.fixture
 def mqtt_client():
     """MQTT client connected to the local broker, with network loop running."""
-    client = mqtt.Client()
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     # Match the broker URL used in the app config: tcp://localhost:1883
     client.connect("localhost", 1883, keepalive=60)
     client.loop_start()
