@@ -1,9 +1,16 @@
 import os
+import platform
+import shutil
+import socket
 import subprocess
+import tempfile
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Literal
 
+import docker
+import docker.errors
 import pytest
 
 ControllerType = Literal["http", "mqtt", "modbus", "bacnet"]
@@ -69,7 +76,101 @@ def mqtt_tmk_application():
         yield
 
 
+# --- Docker-based BACnet fixtures ---
+
+_DOCKERFILE_DUT = Path(__file__).parent / "Dockerfile.dut"
+
+
+def _get_docker_client():
+    """Get Docker client, skip tests if Docker is unavailable."""
+    try:
+        return docker.from_env()
+    except docker.errors.DockerException:
+        pytest.skip("Docker daemon not available")
+
+
+BACNET_HOST_PORT = 47808
+
+
+@pytest.fixture(scope="session")
+def _linux_binary() -> Path:
+    """Return a Linux/amd64 binary, cross-compiling on non-Linux hosts."""
+    if platform.system() == "Linux":
+        binary = Path(".bin/thermocktat")
+        if not binary.exists():
+            pytest.fail(
+                "Binary not found at .bin/thermocktat. "
+                "Run: CGO_ENABLED=0 go build -o .bin/thermocktat ../cmd/thermocktat"
+            )
+        return binary
+
+    # Non-Linux: cross-compile for linux/amd64
+    binary = Path(".bin/thermocktat-linux-amd64")
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            ["go", "build", "-o", str(binary), "../cmd/thermocktat"],
+            env={**os.environ, "GOOS": "linux", "GOARCH": "amd64", "CGO_ENABLED": "0"},
+            check=True,
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("go not found in PATH; cannot cross-compile for Linux")
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"go build failed:\n{e.stderr.decode()}")
+    return binary
+
+
 @pytest.fixture(scope="module")
-def bacnet_tmk_application():
-    with tmk_application(controller="bacnet", addr="127.0.0.1:47808"):
-        yield
+def bacnet_tmk_container(_linux_binary: Path):
+    """Build a FROM-scratch image from the current binary and run the BACnet DUT."""
+    client = _get_docker_client()
+
+    image_tag = "thermocktat:integration-test"
+
+    with tempfile.TemporaryDirectory() as ctx:
+        shutil.copy(_linux_binary, Path(ctx) / "thermocktat")
+        shutil.copy(_DOCKERFILE_DUT, Path(ctx) / "Dockerfile")
+        try:
+            client.images.build(path=ctx, tag=image_tag, rm=True)
+        except docker.errors.BuildError as e:
+            pytest.fail(f"Docker image build failed: {e}")
+        except docker.errors.DockerException as e:
+            pytest.skip(f"Docker error building image: {e}")
+
+    container = client.containers.run(
+        image_tag,
+        detach=True,
+        ports={"47808/udp": BACNET_HOST_PORT},
+        environment={
+            "TMK_CONTROLLER": "bacnet",
+            "TMK_ADDR": "0.0.0.0:47808",
+        },
+        remove=True,
+    )
+
+    try:
+        time.sleep(2)
+
+        container.reload()
+        if container.status != "running":
+            pytest.fail(f"Container failed to start: {container.status}")
+
+        yield container
+    finally:
+        try:
+            container.stop(timeout=5)
+        except docker.errors.APIError:
+            pass
+
+
+@pytest.fixture
+def bacnet_socket_docker(bacnet_tmk_container):
+    """Provide a UDP socket connected to the BACnet controller via port mapping."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2.0)
+    sock.connect(("127.0.0.1", BACNET_HOST_PORT))
+    try:
+        yield sock
+    finally:
+        sock.close()

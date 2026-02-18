@@ -9,7 +9,6 @@ import struct
 
 import pytest
 
-BACNET_ADDR = ("127.0.0.1", 47808)
 TIMEOUT = 2.0
 
 # BACnet object types
@@ -182,13 +181,9 @@ def parse_iam_device_instance(data: bytes) -> int:
 
 
 @pytest.fixture
-def bacnet_socket():
-    """Provide a UDP socket connected to the BACnet controller."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(TIMEOUT)
-    sock.connect(BACNET_ADDR)
-    yield sock
-    sock.close()
+def bacnet_socket(bacnet_socket_docker):
+    """Provide a UDP socket connected to the BACnet controller in Docker."""
+    yield bacnet_socket_docker
 
 
 def send_recv(sock: socket.socket, data: bytes) -> bytes:
@@ -199,15 +194,19 @@ def send_recv(sock: socket.socket, data: bytes) -> bytes:
 # --- Tests ---
 
 
-def test_whois_iam(bacnet_tmk_application, bacnet_socket):
-    """Who-Is should be answered with I-Am containing device instance 1 (default)."""
+def test_whois_iam(bacnet_tmk_container, bacnet_socket):
+    """Who-Is should be answered with I-Am containing device instance 1 (default).
+
+    Note: This test requires network access to the Docker container. The BACnet
+    controller should respond to Who-Is requests sent directly to its IP address.
+    """
     resp = send_recv(bacnet_socket, build_whois())
     assert _parse_apdu_type(resp) == 1  # UnconfirmedReq (I-Am is type 0x10 >> 4 = 1)
     instance = parse_iam_device_instance(resp)
     assert instance == 1  # default device_instance from config_defaults.yaml
 
 
-def test_read_ambient_temperature(bacnet_tmk_application, bacnet_socket):
+def test_read_ambient_temperature(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_ANALOG_INPUT, 0, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert not is_error(resp), "expected ComplexACK, got Error"
@@ -216,7 +215,7 @@ def test_read_ambient_temperature(bacnet_tmk_application, bacnet_socket):
     assert 5.0 < val < 40.0, f"ambient_temperature out of range: {val}"
 
 
-def test_read_temperature_setpoint(bacnet_tmk_application, bacnet_socket):
+def test_read_temperature_setpoint(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_ANALOG_VALUE, 0, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert not is_error(resp), "expected ComplexACK, got Error"
@@ -224,7 +223,7 @@ def test_read_temperature_setpoint(bacnet_tmk_application, bacnet_socket):
     assert abs(val - DEFAULT_SETPOINT) < 0.1
 
 
-def test_read_enabled(bacnet_tmk_application, bacnet_socket):
+def test_read_enabled(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_BINARY_VALUE, 0, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert not is_error(resp)
@@ -232,7 +231,7 @@ def test_read_enabled(bacnet_tmk_application, bacnet_socket):
     assert val == 1.0  # default enabled=true
 
 
-def test_read_mode(bacnet_tmk_application, bacnet_socket):
+def test_read_mode(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_MULTI_STATE_VALUE, 0, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert not is_error(resp)
@@ -240,7 +239,7 @@ def test_read_mode(bacnet_tmk_application, bacnet_socket):
     assert val == DEFAULT_MODE_AUTO
 
 
-def test_read_fan_speed(bacnet_tmk_application, bacnet_socket):
+def test_read_fan_speed(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_MULTI_STATE_VALUE, 1, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert not is_error(resp)
@@ -248,7 +247,7 @@ def test_read_fan_speed(bacnet_tmk_application, bacnet_socket):
     assert val == DEFAULT_FAN_AUTO
 
 
-def test_write_temperature_setpoint(bacnet_tmk_application, bacnet_socket):
+def test_write_temperature_setpoint(bacnet_tmk_container, bacnet_socket):
     new_setpoint = 25.0
     pkt = build_write_property(OBJ_ANALOG_VALUE, 0, PROP_PRESENT_VALUE, new_setpoint)
     resp = send_recv(bacnet_socket, pkt)
@@ -262,7 +261,7 @@ def test_write_temperature_setpoint(bacnet_tmk_application, bacnet_socket):
     assert abs(val - new_setpoint) < 0.1
 
 
-def test_write_enabled(bacnet_tmk_application, bacnet_socket):
+def test_write_enabled(bacnet_tmk_container, bacnet_socket):
     # Disable
     pkt = build_write_property(OBJ_BINARY_VALUE, 0, PROP_PRESENT_VALUE, 0.0)
     resp = send_recv(bacnet_socket, pkt)
@@ -281,7 +280,7 @@ def test_write_enabled(bacnet_tmk_application, bacnet_socket):
 
 
 @pytest.mark.parametrize("mode", [1, 2, 3, 4])  # heat, cool, fan, auto
-def test_write_mode(bacnet_tmk_application, bacnet_socket, mode):
+def test_write_mode(bacnet_tmk_container, bacnet_socket, mode):
     pkt = build_write_property(
         OBJ_MULTI_STATE_VALUE, 0, PROP_PRESENT_VALUE, float(mode)
     )
@@ -295,13 +294,13 @@ def test_write_mode(bacnet_tmk_application, bacnet_socket, mode):
     assert val == float(mode)
 
 
-def test_read_unknown_object_returns_error(bacnet_tmk_application, bacnet_socket):
+def test_read_unknown_object_returns_error(bacnet_tmk_container, bacnet_socket):
     pkt = build_read_property(OBJ_ANALOG_INPUT, 99, PROP_PRESENT_VALUE)
     resp = send_recv(bacnet_socket, pkt)
     assert is_error(resp)
 
 
-def test_write_readonly_returns_error(bacnet_tmk_application, bacnet_socket):
+def test_write_readonly_returns_error(bacnet_tmk_container, bacnet_socket):
     """Writing to AnalogInput (ambient_temperature) should return Error."""
     pkt = build_write_property(OBJ_ANALOG_INPUT, 0, PROP_PRESENT_VALUE, 25.0)
     resp = send_recv(bacnet_socket, pkt)
