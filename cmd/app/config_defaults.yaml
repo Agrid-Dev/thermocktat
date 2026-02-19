@@ -30,7 +30,6 @@ thermostat:
   fan_speed: "auto"
 
 regulator:
-  enabled: true
   interval: 1s
   kp: 0.00001
   ki: 0.00001

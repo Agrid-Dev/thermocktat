@@ -58,11 +58,10 @@ type ThermostatConfig struct {
 }
 
 type RegulatorConfig struct {
-	Enabled              bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
 	Interval             time.Duration `koanf:"interval" json:"interval" yaml:"interval"`
-	Kp                   float64       `koanf:"p" json:"p" yaml:"p"`
-	Ki                   float64       `koanf:"i" json:"i" yaml:"i"`
-	Kd                   float64       `koanf:"d" json:"d" yaml:"d"`
+	Kp                   float64       `koanf:"kp" json:"kp" yaml:"kp"`
+	Ki                   float64       `koanf:"ki" json:"ki" yaml:"ki"`
+	Kd                   float64       `koanf:"kd" json:"kd" yaml:"kd"`
 	TargetHysteresis     float64       `koanf:"target_hysteresis" json:"target_hysteresis" yaml:"target_hysteresis"`
 	ModeChangeHysteresis float64       `koanf:"mode_change_hysteresis" json:"mode_change_hysteresis" yaml:"mode_change_hysteresis"`
 }
