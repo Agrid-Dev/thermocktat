@@ -49,15 +49,12 @@ func main() {
 	deviceID := cfg.DeviceID
 
 	// start regulation
-	if cfg.Regulator.Enabled {
-		go func() {
-			if err := th.Run(ctx, cfg.Regulator.Interval); err != nil && err != context.Canceled {
-				log.Printf("thermostat exited: %v", err)
-				cancel()
-			}
-		}()
-
-	}
+	go func() {
+		if err := th.Run(ctx, cfg.Regulator.Interval); err != nil && err != context.Canceled {
+			log.Printf("thermostat exited: %v", err)
+			cancel()
+		}
+	}()
 
 	// Start enabled controllers
 	if cfg.Controllers.HTTP.Enabled {

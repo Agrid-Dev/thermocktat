@@ -58,7 +58,6 @@ type ThermostatConfig struct {
 }
 
 type RegulatorConfig struct {
-	Enabled              bool          `koanf:"enabled" json:"enabled" yaml:"enabled"`
 	Interval             time.Duration `koanf:"interval" json:"interval" yaml:"interval"`
 	Kp                   float64       `koanf:"kp" json:"kp" yaml:"kp"`
 	Ki                   float64       `koanf:"ki" json:"ki" yaml:"ki"`
