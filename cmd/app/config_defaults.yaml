@@ -8,6 +8,7 @@ controllers:
     addr: "tcp://host.docker.internal:1883"
     qos: 0
     retain_snapshot: false
+    publish_mode: interval
     publish_interval: 5s
   modbus:
     enabled: false
