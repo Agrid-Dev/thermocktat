@@ -1,6 +1,10 @@
 package thermostat
 
-import "testing"
+import (
+	"math"
+	"testing"
+	"time"
+)
 
 func assertError(t *testing.T, err error, expected error) {
 	t.Helper()
@@ -178,4 +182,41 @@ func TestSetAmbient(t *testing.T) {
 	th := newTestThermostat(t, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	th.setAmbient(25.4)
 	assertEqual(t, "AmbientTemperature", th.Get().AmbientTemperature, 25.4)
+}
+
+func TestDisabledNoRegulation(t *testing.T) {
+	outdoorTemp := 10.0
+	heatLossCoeff := 0.001
+	initialAmbient := 21.0
+	dt := 1 * time.Second
+
+	pidParams := PIDRegulatorParams{
+		Kp:                  1.0,
+		Ki:                  0.1,
+		Kd:                  0.01,
+		TargetHysteresis:    1.0,
+		ModeChangeHysteresis: 2.0,
+	}
+	heatLossParams := HeatLossSimulatorParams{
+		OutdoorTemperature: outdoorTemp,
+		Coefficient:        heatLossCoeff,
+	}
+
+	th := newTestThermostat(t, pidParams, heatLossParams, func(s *Snapshot) {
+		s.Enabled = false
+		s.AmbientTemperature = initialAmbient
+		s.Mode = ModeHeat
+		s.TemperatureSetpoint = 25 // setpoint above ambient => would heat if enabled
+	})
+
+	th.UpdateAmbient(dt)
+
+	// Expected: only heat loss, no regulation
+	expectedDelta := heatLossCoeff * (outdoorTemp - initialAmbient) * dt.Seconds()
+	expectedAmbient := initialAmbient + expectedDelta
+	got := th.Get().AmbientTemperature
+
+	if math.Abs(got-expectedAmbient) > 1e-9 {
+		t.Fatalf("disabled thermostat should only apply heat loss: got %.9f, want %.9f", got, expectedAmbient)
+	}
 }
