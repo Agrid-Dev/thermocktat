@@ -132,7 +132,10 @@ func (t *Thermostat) setAmbient(temp float64) {
 func (t *Thermostat) UpdateAmbient(dt time.Duration) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	deltaReg := t.reg.DeltaTemperature(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
+	var deltaReg float64
+	if t.s.Enabled {
+		deltaReg = t.reg.DeltaTemperature(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
+	}
 	deltaHeatLoss := t.heatLoss.DeltaTemperature(t.s.AmbientTemperature, dt)
 	newAmbient := t.s.AmbientTemperature + deltaReg + deltaHeatLoss
 	t.setAmbient(newAmbient)
