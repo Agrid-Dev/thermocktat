@@ -191,10 +191,10 @@ func TestDisabledNoRegulation(t *testing.T) {
 	dt := 1 * time.Second
 
 	pidParams := PIDRegulatorParams{
-		Kp:                  1.0,
-		Ki:                  0.1,
-		Kd:                  0.01,
-		TargetHysteresis:    1.0,
+		Kp:                   1.0,
+		Ki:                   0.1,
+		Kd:                   0.01,
+		TargetHysteresis:     1.0,
 		ModeChangeHysteresis: 2.0,
 	}
 	heatLossParams := HeatLossSimulatorParams{
