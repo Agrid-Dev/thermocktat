@@ -69,52 +69,168 @@ jobs:
           path: .bin/thermocktat
           retention-days: 1
 
+  docker-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            suffix: amd64
+          - platform: linux/arm64
+            suffix: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          sbom: false
+          tags: thermocktat:ci-${{ matrix.suffix }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+          build-args: |
+            VERSION=sha-${{ github.sha }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.head_commit.timestamp }}
+          outputs: type=docker,dest=/tmp/image-${{ matrix.suffix }}.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.suffix }}
+          path: /tmp/image-${{ matrix.suffix }}.tar
+          retention-days: 1
+
+  docker-scan:
+    needs: docker-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download amd64 image
+        uses: actions/download-artifact@v4
+        with:
+          name: image-amd64
+          path: /tmp/
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          input: /tmp/image-amd64.tar
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
   integration-tests:
-      needs: test-lint-build
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
+    needs: test-lint-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
         - name: Install uv
           uses: astral-sh/setup-uv@v7
 
-        - name: Set up Python
-          run: uv python install
+      - name: Set up Python
+        run: uv python install
 
-        - name: Lint and Type Check (Python)
-          run: |
-            cd integration
-            uv sync
-            uv run ruff check .
-            uv run ruff format --check .
-            uv run ty check
+      - name: Lint and Type Check (Python)
+        run: |
+          cd integration
+          uv sync
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run ty check
 
-        - name: Write mosquitto config (allow anonymous)
-          run: |
-            cat > /tmp/mosquitto.conf <<'EOF'
-            listener 1883 0.0.0.0
-            allow_anonymous true
-            persistence false
-            EOF
+      - name: Write mosquitto config (allow anonymous)
+        run: |
+          cat > /tmp/mosquitto.conf <<'EOF'
+          listener 1883 0.0.0.0
+          allow_anonymous true
+          persistence false
+          EOF
 
-        - name: Start Mosquitto Broker
-          run: |
-            docker run -d --name mosquitto \
-              -p 1883:1883 \
-              -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro \
-              eclipse-mosquitto:2.0
+      - name: Start Mosquitto Broker
+        run: |
+          docker run -d --name mosquitto \
+            -p 1883:1883 \
+            -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro \
+            eclipse-mosquitto:2.0
 
-        - name: Download Binary
-          uses: actions/download-artifact@v4
-          with:
-            name: thermocktat-binary
-            path: integration/.bin/
+      - name: Download Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: thermocktat-binary
+          path: integration/.bin/
 
-        - name: Fix permissions
-          run: chmod +x integration/.bin/thermocktat
+      - name: Fix permissions
+        run: chmod +x integration/.bin/thermocktat
 
-        - name: Run pytest
-          run: |
-            cd integration
-            uv run pytest
+      - name: Run pytest
+        run: |
+          cd integration
+          uv run pytest
+
+  docker-push:
+    if: github.event_name == 'push'
+    needs: [docker-scan, integration-tests]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download image artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/
+          pattern: image-*
+          merge-multiple: true
+
+      - name: Normalize image name
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermocktat"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Push platform images
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          SHA="${{ github.sha }}"
+
+          for arch in amd64 arm64; do
+            skopeo copy \
+              --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              "docker-archive:/tmp/image-${arch}.tar" \
+              "docker://${IMAGE}:sha-${SHA::7}-${arch}"
+          done
+
+      - name: Create and push manifest
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          SHA="${{ github.sha }}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE}:sha-${SHA::7}" \
+            "${IMAGE}:sha-${SHA::7}-amd64" \
+            "${IMAGE}:sha-${SHA::7}-arm64"
