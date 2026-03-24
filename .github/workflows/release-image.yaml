@@ -52,6 +52,8 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.TAG }}
+          provenance: false
+          sbom: false
           build-args: |
             VERSION=${{ steps.meta.outputs.TAG }}
             COMMIT=${{ github.sha }}
