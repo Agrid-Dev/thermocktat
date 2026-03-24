@@ -117,7 +117,7 @@ jobs:
 
     steps:
       - name: Download amd64 image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: image-amd64
           path: /tmp/
@@ -168,7 +168,7 @@ jobs:
             eclipse-mosquitto:2.0
 
       - name: Download Binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: thermocktat-binary
           path: integration/.bin/
@@ -187,7 +187,7 @@ jobs:
 
     steps:
       - name: Download amd64 image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: image-amd64
           path: /tmp/
@@ -233,7 +233,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download image artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/
           pattern: image-*
