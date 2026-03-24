@@ -35,22 +35,33 @@ jobs:
           IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermocktat"
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
 
-      - name: Verify source image exists
+      - name: Resolve image SHA
+        id: resolve
         run: |
           IMAGE="${{ steps.meta.outputs.image }}"
-          SHA="${{ github.sha }}"
-          docker buildx imagetools inspect "${IMAGE}:sha-${SHA::7}" > /dev/null 2>&1 || \
-            (echo "::error::Image ${IMAGE}:sha-${SHA::7} not found. Ensure CI passed on main for this commit." && exit 1)
+
+          # For merge commits, the PR head SHA (2nd parent) is what CI tagged.
+          # For non-merge commits, fall back to HEAD.
+          for SHA in $(git rev-parse HEAD^2 2>/dev/null) $(git rev-parse HEAD); do
+            TAG="sha-${SHA::7}"
+            if docker buildx imagetools inspect "${IMAGE}:${TAG}" > /dev/null 2>&1; then
+              echo "Found image at ${IMAGE}:${TAG}"
+              echo "tag=${TAG}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+
+          echo "::error::No image found for this commit. Ensure CI passed on the PR."
+          exit 1
 
       - name: Retag image with version and latest
         run: |
           IMAGE="${{ steps.meta.outputs.image }}"
-          SHA="${{ github.sha }}"
 
           docker buildx imagetools create \
             -t "${IMAGE}:${{ github.ref_name }}" \
             -t "${IMAGE}:latest" \
-            "${IMAGE}:sha-${SHA::7}"
+            "${IMAGE}:${{ steps.resolve.outputs.tag }}"
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
