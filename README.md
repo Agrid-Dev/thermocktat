@@ -106,11 +106,11 @@ Two GitHub Actions workflows handle CI and releases separately.
 
 ### CI (`.github/workflows/ci.yaml`)
 
-Runs on PRs and pushes to `main`.
+Runs on PRs (and `workflow_dispatch`). Main is protected — all changes go through PRs.
 
 ```
 test-lint-build ──→ integration-tests ──┐
-                                        ├──→ docker-push (main only)
+                                        ├──→ docker-push
 docker-build ──→ docker-scan ───────────┘
 ```
 
@@ -118,7 +118,7 @@ docker-build ──→ docker-scan ───────────┘
 - **docker-build**: Builds `linux/amd64` and `linux/arm64` images in parallel, uploads as artifacts.
 - **docker-scan**: Runs [Trivy](https://github.com/aquasecurity/trivy) vulnerability scan on the built image. Fails on CRITICAL/HIGH CVEs.
 - **integration-tests**: Python (pytest) end-to-end tests for each controller protocol.
-- **docker-push** (main only): After all checks pass, pushes the validated images to `ghcr.io` tagged with the commit SHA (e.g., `:sha-abc1234`).
+- **docker-push**: After all checks pass, pushes the validated images to `ghcr.io` tagged with the commit SHA (e.g., `:sha-abc1234`).
 
 ### Release (`.github/workflows/release.yaml`)
 
