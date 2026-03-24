@@ -1,5 +1,5 @@
 # ---- build stage ----
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 WORKDIR /src
 RUN apk add --no-cache ca-certificates git

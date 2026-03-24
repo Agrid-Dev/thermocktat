@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]*.[0-9]*.[0-9]*"]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize image name
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermocktat"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Verify source image exists
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          SHA="${{ github.sha }}"
+          docker buildx imagetools inspect "${IMAGE}:sha-${SHA::7}" > /dev/null 2>&1 || \
+            (echo "::error::Image ${IMAGE}:sha-${SHA::7} not found. Ensure CI passed on main for this commit." && exit 1)
+
+      - name: Retag image with version and latest
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          SHA="${{ github.sha }}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE}:${{ github.ref_name }}" \
+            -t "${IMAGE}:latest" \
+            "${IMAGE}:sha-${SHA::7}"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image
+        run: |
+          cosign sign --yes "${{ steps.meta.outputs.image }}:${{ github.ref_name }}"
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since ${PREV_TAG}" > /tmp/changelog.md
+            git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD" >> /tmp/changelog.md
+          else
+            echo "## Initial release" > /tmp/changelog.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file /tmp/changelog.md
