@@ -35,24 +35,39 @@ jobs:
           IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermocktat"
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
 
-      - name: Resolve image SHA
+      - name: Find PR that delivered this commit
         id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           IMAGE="${{ steps.meta.outputs.image }}"
 
-          # For merge commits, the PR head SHA (2nd parent) is what CI tagged.
-          # For non-merge commits, fall back to HEAD.
-          for SHA in $(git rev-parse HEAD^2 2>/dev/null) $(git rev-parse HEAD); do
-            TAG="sha-${SHA::7}"
-            if docker buildx imagetools inspect "${IMAGE}:${TAG}" > /dev/null 2>&1; then
-              echo "Found image at ${IMAGE}:${TAG}"
-              echo "tag=${TAG}" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          done
+          # Find the PR that merged this commit (or its parent for merge commits)
+          PR=$(gh pr list --repo "${{ github.repository }}" --state merged --search "${{ github.sha }}" \
+            --json number --jq '.[0].number')
 
-          echo "::error::No image found for this commit. Ensure CI passed on the PR."
-          exit 1
+          if [ -z "$PR" ]; then
+            # For merge commits, try the second parent (PR head)
+            PARENT=$(git rev-parse HEAD^2 2>/dev/null || true)
+            if [ -n "$PARENT" ]; then
+              PR=$(gh pr list --repo "${{ github.repository }}" --state merged --search "$PARENT" \
+                --json number --jq '.[0].number')
+            fi
+          fi
+
+          if [ -z "$PR" ]; then
+            echo "::error::No merged PR found for this commit. Tag a commit that was delivered via PR."
+            exit 1
+          fi
+
+          TAG="pr-${PR}"
+          if ! docker buildx imagetools inspect "${IMAGE}:${TAG}" > /dev/null 2>&1; then
+            echo "::error::Image ${IMAGE}:${TAG} not found. Ensure CI passed on PR #${PR}."
+            exit 1
+          fi
+
+          echo "Found image at ${IMAGE}:${TAG} (PR #${PR})"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Retag image with version and latest
         run: |

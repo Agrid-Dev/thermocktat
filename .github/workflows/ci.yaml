@@ -99,7 +99,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,scope=${{ matrix.platform }},mode=max
           build-args: |
-            VERSION=sha-${{ github.event.pull_request.head.sha || github.sha }}
+            VERSION=pr-${{ github.event.pull_request.number || 0 }}
             COMMIT=${{ github.event.pull_request.head.sha || github.sha }}
             DATE=${{ github.event.head_commit.timestamp }}
           outputs: type=docker,dest=/tmp/image-${{ matrix.suffix }}.tar
@@ -181,8 +181,42 @@ jobs:
           cd integration
           uv run pytest
 
+  docker-smoke-test:
+    needs: docker-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download amd64 image
+        uses: actions/download-artifact@v4
+        with:
+          name: image-amd64
+          path: /tmp/
+
+      - name: Load image
+        run: docker load -i /tmp/image-amd64.tar
+
+      - name: Run container
+        run: |
+          docker run -d --name smoke \
+            -e TMK_CONTROLLER=http \
+            -p 8080:8080 \
+            thermocktat:ci-amd64
+
+      - name: Smoke test
+        run: |
+          sleep 2
+          curl -sf http://localhost:8080/v1 | tee /dev/stderr | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); assert 'temperature_setpoint' in d, 'missing temperature_setpoint'"
+          curl -sf http://localhost:8080/version | tee /dev/stderr | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); assert 'version' in d, 'missing version'"
+          curl -sf http://localhost:8080/healthz
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs smoke
+
   docker-push:
-    needs: [docker-scan, integration-tests]
+    needs: [docker-scan, docker-smoke-test, integration-tests]
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -214,21 +248,21 @@ jobs:
       - name: Push platform images
         run: |
           IMAGE="${{ steps.meta.outputs.image }}"
-          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          TAG="pr-${{ github.event.pull_request.number }}"
 
           for arch in amd64 arm64; do
             skopeo copy \
               --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
               "docker-archive:/tmp/image-${arch}.tar" \
-              "docker://${IMAGE}:sha-${SHA::7}-${arch}"
+              "docker://${IMAGE}:${TAG}-${arch}"
           done
 
       - name: Create and push manifest
         run: |
           IMAGE="${{ steps.meta.outputs.image }}"
-          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          TAG="pr-${{ github.event.pull_request.number }}"
 
           docker buildx imagetools create \
-            -t "${IMAGE}:sha-${SHA::7}" \
-            "${IMAGE}:sha-${SHA::7}-amd64" \
-            "${IMAGE}:sha-${SHA::7}-arm64"
+            -t "${IMAGE}:${TAG}" \
+            "${IMAGE}:${TAG}-amd64" \
+            "${IMAGE}:${TAG}-arm64"

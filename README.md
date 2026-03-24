@@ -118,11 +118,11 @@ docker-build ──→ docker-scan ───────────┘
 - **docker-build**: Builds `linux/amd64` and `linux/arm64` images in parallel, uploads as artifacts.
 - **docker-scan**: Runs [Trivy](https://github.com/aquasecurity/trivy) vulnerability scan on the built image. Fails on CRITICAL/HIGH CVEs.
 - **integration-tests**: Python (pytest) end-to-end tests for each controller protocol.
-- **docker-push**: After all checks pass, pushes the validated images to `ghcr.io` tagged with the commit SHA (e.g., `:sha-abc1234`).
+- **docker-push**: After all checks pass, pushes the validated images to `ghcr.io` tagged with the PR number (e.g., `:pr-42`).
 
 ### Release (`.github/workflows/release.yaml`)
 
-Runs on tag pushes. Retags the existing SHA image with the version and `latest` — no rebuild. Signs the image with [cosign](https://github.com/sigstore/cosign) (keyless) and creates a GitHub Release with an auto-generated changelog.
+Runs on tag pushes. Finds the merged PR for the tagged commit, retags its `:pr-N` image with the version and `latest` — no rebuild. Signs the image with [cosign](https://github.com/sigstore/cosign) (keyless) and creates a GitHub Release with an auto-generated changelog.
 
 ### Releasing
 
@@ -131,4 +131,4 @@ git tag v0.7.0
 git push origin v0.7.0
 ```
 
-The release workflow finds the image already pushed by CI for that commit, retags it, signs it, and creates the GitHub Release.
+The release workflow finds the merged PR for that commit, locates the corresponding `:pr-N` image, retags it, signs it, and creates the GitHub Release.
