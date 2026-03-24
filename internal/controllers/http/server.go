@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Agrid-Dev/thermocktat/internal/buildinfo"
 	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
@@ -32,6 +33,14 @@ func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
 	mux.HandleFunc("POST /v1/temperature_setpoint_max", s.handlePostMaxSetpoint)
 	mux.HandleFunc("POST /v1/mode", s.handlePostMode)
 	mux.HandleFunc("POST /v1/fan_speed", s.handlePostFanSpeed)
+
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"version": buildinfo.Version,
+			"commit":  buildinfo.Commit,
+			"date":    buildinfo.Date,
+		})
+	})
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

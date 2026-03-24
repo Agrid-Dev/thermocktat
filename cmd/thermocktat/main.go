@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/Agrid-Dev/thermocktat/cmd/app"
+	"github.com/Agrid-Dev/thermocktat/internal/buildinfo"
 	bacnetctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/bacnet"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
 	modbusctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/modbus"
@@ -20,6 +21,8 @@ func main() {
 	var configPath string
 	flag.StringVar(&configPath, "config", "config.yaml", "path to config file (.yaml/.yml/.json)")
 	flag.Parse()
+
+	log.Println(buildinfo.String())
 
 	cfg, err := app.LoadConfig(configPath)
 	if err != nil {
