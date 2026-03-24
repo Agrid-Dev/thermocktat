@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Allow only what the Dockerfile needs
+!go.mod
+!go.sum
+!cmd/
+!internal/

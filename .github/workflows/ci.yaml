@@ -42,7 +42,7 @@ jobs:
 
       - name: gopls check (lint)
         run: |
-          gopls check cmd/thermocktat/main.go cmd/app/config.go internal/thermostat/*.go internal/controllers/http/*.go
+          gopls check $(find . -name '*.go' -not -path './integration/*')
 
       - name: go vet
         run: |
