@@ -10,7 +10,7 @@ require (
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.0
-	github.com/knadh/koanf/v2 v2.3.2
+	github.com/knadh/koanf/v2 v2.3.4
 	github.com/tbrandon/mbserver v0.0.0-20231208015628-36eb59221ac2
 	github.com/ulbios/bacnet v0.0.0-20230910233229-227d62272ce9
 	gopkg.in/yaml.v3 v3.0.1
