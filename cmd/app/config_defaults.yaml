@@ -20,6 +20,12 @@ controllers:
     addr: "0.0.0.0:47808"
     device_instance: 1
     sync_interval: 0.5s
+  knx:
+    enabled: false
+    addr: "0.0.0.0:3671"
+    publish_interval: 10s
+    ga_main: 1
+    ga_middle: 0
 
 thermostat:
   enabled: true

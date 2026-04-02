@@ -13,7 +13,7 @@ import docker
 import docker.errors
 import pytest
 
-ControllerType = Literal["http", "mqtt", "modbus", "bacnet"]
+ControllerType = Literal["http", "mqtt", "modbus", "bacnet", "knx"]
 
 
 @contextmanager
@@ -66,6 +66,16 @@ def modbus_tmk_application_32bit():
         controller="modbus",
         addr="0.0.0.0:1503",
         extra_env={"TMK_CONTROLLERS_MODBUS_REGISTER_COUNT": "2"},
+    ):
+        yield
+
+
+@pytest.fixture(scope="module")
+def knx_tmk_application():
+    with tmk_application(
+        controller="knx",
+        addr="0.0.0.0:3671",
+        extra_env={"TMK_CONTROLLERS_KNX_PUBLISH_INTERVAL": "1s"},
     ):
         yield
 
