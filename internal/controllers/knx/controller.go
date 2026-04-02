@@ -185,8 +185,11 @@ func (c *Controller) sendConnectResponse(status uint8, addr *net.UDPAddr) {
 		channelID = c.client.channelID
 	}
 
-	localAddr := c.conn.LocalAddr().(*net.UDPAddr)
-	dataHPAI := MarshalHPAI(localAddr.IP, uint16(localAddr.Port))
+	// Data endpoint HPAI: use 0.0.0.0:0 (route-back / NAT mode) so the client
+	// sends tunneling data to the same address it connected to. This is required
+	// for Docker port-mapped deployments where the container's internal IP is
+	// not reachable from the host.
+	dataHPAI := MarshalHPAINAT()
 
 	// CRD: Connection Response Data block — tunnel connection.
 	crd := []byte{0x04, ConnTypeTunnel, byte(individualAddr >> 8), byte(individualAddr & 0xFF)}
