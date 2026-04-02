@@ -12,6 +12,7 @@ import (
 	"github.com/Agrid-Dev/thermocktat/internal/buildinfo"
 	bacnetctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/bacnet"
 	httpctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/http"
+	knxctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/knx"
 	modbusctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/modbus"
 	mqttctrl "github.com/Agrid-Dev/thermocktat/internal/controllers/mqtt"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
@@ -130,6 +131,26 @@ func main() {
 			log.Printf("bacnet controller listening to %s with DeviceInstance %d", cfg.Controllers.BACNET.Addr, cfg.Controllers.BACNET.DeviceInstance)
 			if err := bc.Run(ctx); err != nil && err != context.Canceled {
 				log.Printf("bacnet controller exited: %v", err)
+				cancel()
+			}
+		}()
+	}
+
+	if cfg.Controllers.KNX.Enabled {
+		kc, err := knxctrl.New(th, knxctrl.Config{
+			DeviceID:        deviceID,
+			Addr:            cfg.Controllers.KNX.Addr,
+			PublishInterval: cfg.Controllers.KNX.PublishInterval,
+			GAMain:          cfg.Controllers.KNX.GAMain,
+			GAMiddle:        cfg.Controllers.KNX.GAMiddle,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() {
+			log.Printf("knx controller listening on %s", cfg.Controllers.KNX.Addr)
+			if err := kc.Run(ctx); err != nil && err != context.Canceled {
+				log.Printf("knx controller exited: %v", err)
 				cancel()
 			}
 		}()
