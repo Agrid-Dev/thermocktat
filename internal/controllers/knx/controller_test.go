@@ -101,7 +101,14 @@ func readGA(t *testing.T, conn *net.UDPConn, channelID uint8, seq *uint8, ga uin
 		t.Fatalf("expected ACK, got 0x%04X", h.ServiceType)
 	}
 
-	// Read response (TUNNELING_REQUEST from server).
+	// Read L_DATA_CON (confirmation), then the actual response.
+	n, err = conn.Read(buf)
+	if err != nil {
+		t.Fatalf("read l_data_con: %v", err)
+	}
+	expectLDataCon(t, buf[:n])
+
+	// Read response (TUNNELING_REQUEST from server with GroupValueResponse).
 	n, err = conn.Read(buf)
 	if err != nil {
 		t.Fatalf("read response: %v", err)
@@ -126,6 +133,32 @@ func writeGA(t *testing.T, conn *net.UDPConn, channelID uint8, seq *uint8, ga ui
 	h, _ := ParseHeader(buf[:n])
 	if h.ServiceType != ServiceTunnelingACK {
 		t.Fatalf("expected ACK, got 0x%04X", h.ServiceType)
+	}
+
+	// Read L_DATA_CON (confirmation).
+	n, err = conn.Read(buf)
+	if err != nil {
+		t.Fatalf("read l_data_con: %v", err)
+	}
+	expectLDataCon(t, buf[:n])
+}
+
+// expectLDataCon verifies a packet is a TUNNELING_REQUEST containing an L_Data.con CEMI.
+func expectLDataCon(t *testing.T, pkt []byte) {
+	t.Helper()
+	h, err := ParseHeader(pkt)
+	if err != nil {
+		t.Fatalf("l_data_con: bad header: %v", err)
+	}
+	if h.ServiceType != ServiceTunnelingRequest {
+		t.Fatalf("l_data_con: expected TUNNELING_REQUEST, got 0x%04X", h.ServiceType)
+	}
+	cemiData := pkt[headerSize+4:] // skip header + 4-byte tunneling header
+	if len(cemiData) < 1 {
+		t.Fatal("l_data_con: empty CEMI")
+	}
+	if cemiData[0] != CEMIMsgCodeLDataCon {
+		t.Fatalf("l_data_con: expected msg code 0x2E, got 0x%02X", cemiData[0])
 	}
 }
 
