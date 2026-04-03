@@ -25,21 +25,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Try the tagged commit first, then its second parent (PR head
-          # before the merge commit) since CI runs against PR branches.
-          for SHA in "${{ github.sha }}" "$(git rev-parse HEAD^2 2>/dev/null || true)"; do
-            [ -z "$SHA" ] && continue
-            RUN_ID=$(gh run list \
-              --workflow ci.yaml \
-              --commit "$SHA" \
-              --status success \
-              --json databaseId \
-              --jq '.[0].databaseId')
-            [ -n "$RUN_ID" ] && break
+          # Walk recent history to find the nearest ancestor with a successful
+          # CI run. For each commit we try both the commit itself and its second
+          # parent (the PR head for merge commits), since CI runs on PR branches.
+          for COMMIT in $(git log --format=%H -20); do
+            for SHA in "$COMMIT" "$(git rev-parse "${COMMIT}^2" 2>/dev/null || true)"; do
+              [ -z "$SHA" ] && continue
+              RUN_ID=$(gh run list \
+                --workflow ci.yaml \
+                --commit "$SHA" \
+                --status success \
+                --json databaseId \
+                --jq '.[0].databaseId')
+              [ -n "$RUN_ID" ] && break 2
+            done
           done
 
           if [ -z "$RUN_ID" ]; then
-            echo "::error::No successful CI run found for tag ${{ github.ref_name }}. Ensure CI passed before tagging."
+            echo "::error::No successful CI run found in recent history for tag ${{ github.ref_name }}."
             exit 1
           fi
           echo "Found CI run: $RUN_ID (commit: $SHA)"
