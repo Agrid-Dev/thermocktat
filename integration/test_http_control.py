@@ -1,5 +1,3 @@
-import os
-import subprocess
 import time
 
 import httpx
@@ -54,19 +52,13 @@ def test_write_mode(http_tmk_application, http_client, mode):
     assert snapshot["mode"] == mode
 
 
-def test_custom_port_configuration():
+def test_custom_port_configuration(tmk_run):
     custom_port = 8081
     custom_url = f"http://localhost:{custom_port}"
-    env = os.environ.copy()
-    env["TMK_CONTROLLER"] = "http"
-    env["TMK_CONTROLLERS_HTTP_ADDR"] = f":{custom_port}"
-    env["TMK_REGULATOR_MODE_CHANGE_HYSTERESIS"] = "2.0"
-    env["TMK_REGULATOR_TARGET_HYSTERESIS"] = "1.0"
-
-    process = subprocess.Popen(
-        ["./.bin/thermocktat"], env=env, stdout=None, stderr=None
-    )
-    try:
+    with tmk_run(
+        controller="http",
+        extra_env={"TMK_CONTROLLERS_HTTP_ADDR": f":{custom_port}"},
+    ):
         time.sleep(1)
         with httpx.Client(base_url=custom_url) as client:
             new_setpoint = 22.5
@@ -76,7 +68,3 @@ def test_custom_port_configuration():
             assert response.status_code == 200
             snapshot = response.json()
             assert snapshot["temperature_setpoint"] == new_setpoint
-
-    finally:
-        process.terminate()
-        process.wait()

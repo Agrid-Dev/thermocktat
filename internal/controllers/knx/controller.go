@@ -280,6 +280,12 @@ func (c *Controller) handleTunneling(body []byte, _ net.Addr) {
 		return
 	}
 
+	// Send L_Data.con to confirm delivery to the virtual KNX bus (KNX spec 03/06/03 §4.1.5).
+	if cemi.MsgCode == CEMIMsgCodeLDataReq {
+		conCEMI := BuildCEMILDataCon(cemiData)
+		c.sendTunnelingRequest(conCEMI, clientAddr)
+	}
+
 	c.dispatchCEMI(cemi, clientAddr)
 }
 

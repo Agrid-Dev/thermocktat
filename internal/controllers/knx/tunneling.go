@@ -8,7 +8,8 @@ import (
 // CEMI message codes.
 const (
 	CEMIMsgCodeLDataReq uint8 = 0x11 // client → server
-	CEMIMsgCodeLDataInd uint8 = 0x29 // server → client
+	CEMIMsgCodeLDataCon uint8 = 0x2E // server → client (data link layer confirmation)
+	CEMIMsgCodeLDataInd uint8 = 0x29 // server → client (indication / unsolicited)
 )
 
 // APCI command masks (in the first 2 bytes of the APDU).
@@ -142,6 +143,19 @@ func BuildCEMIGroupValueWrite(srcAddr, dstGA uint16, data []byte, compact bool) 
 	cemi = append(cemi, byte(dataLen))
 	cemi = append(cemi, apdu...)
 	return cemi
+}
+
+// BuildCEMILDataCon returns an L_Data.con frame confirming delivery of the
+// given L_Data.req CEMI to the (virtual) KNX bus. Per KNX specification
+// 03/06/03 §4.1.5, the server must send this confirmation so that the client
+// knows it can proceed with the next telegram.
+func BuildCEMILDataCon(rawReq []byte) []byte {
+	con := make([]byte, len(rawReq))
+	copy(con, rawReq)
+	if len(con) > 0 {
+		con[0] = CEMIMsgCodeLDataCon
+	}
+	return con
 }
 
 // Tunneling connection header (4 bytes): [0x04, channelID, seqCounter, status]

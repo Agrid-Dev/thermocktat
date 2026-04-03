@@ -16,13 +16,33 @@ import pytest
 ControllerType = Literal["http", "mqtt", "modbus", "bacnet", "knx"]
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--docker-image",
+        default=None,
+        help="Run tests against a Docker image instead of the local binary.",
+    )
+
+
+@pytest.fixture(scope="session")
+def docker_image(request):
+    """Return the Docker image name if --docker-image was passed, else None."""
+    return request.config.getoption("--docker-image")
+
+
+# --- Application launchers ---
+
+
 @contextmanager
 def tmk_application(
-    controller: ControllerType, addr: str, extra_env: dict | None = None
+    controller: ControllerType,
+    addr: str | None = None,
+    extra_env: dict | None = None,
 ):
     env = os.environ.copy()
     env["TMK_CONTROLLER"] = controller
-    env["TMK_ADDR"] = addr
+    if addr is not None:
+        env["TMK_ADDR"] = addr
 
     # Regulator settings
     env["TMK_REGULATOR_MODE_CHANGE_HYSTERESIS"] = "2.0"
@@ -48,21 +68,87 @@ def tmk_application(
             process.wait()
 
 
+def _get_docker_client():
+    """Get Docker client, skip tests if Docker is unavailable."""
+    try:
+        return docker.from_env()
+    except docker.errors.DockerException:
+        pytest.skip("Docker daemon not available")
+
+
+@contextmanager
+def tmk_docker_application(
+    image: str,
+    controller: ControllerType,
+    addr: str | None = None,
+    extra_env: dict | None = None,
+):
+    """Run thermocktat in a Docker container with --network host."""
+    client = _get_docker_client()
+    env: dict[str, str] = {
+        "TMK_CONTROLLER": controller,
+        "TMK_REGULATOR_MODE_CHANGE_HYSTERESIS": "2.0",
+        "TMK_REGULATOR_TARGET_HYSTERESIS": "1.0",
+    }
+    if addr is not None:
+        env["TMK_ADDR"] = addr
+    if extra_env:
+        env.update(extra_env)
+
+    container = client.containers.run(
+        image,
+        detach=True,
+        network_mode="host",
+        environment=env,
+        remove=True,
+    )
+    try:
+        time.sleep(2)
+        container.reload()
+        if container.status != "running":
+            logs = container.logs().decode()
+            pytest.fail(f"Container failed to start: {container.status}\n{logs}")
+        yield container
+    finally:
+        try:
+            container.stop(timeout=5)
+        except docker.errors.APIError:
+            pass
+
+
+@pytest.fixture(scope="session")
+def tmk_run(docker_image):
+    """Factory that returns the right context manager for the current mode."""
+    if docker_image:
+
+        def _run(controller, addr=None, extra_env=None):
+            return tmk_docker_application(docker_image, controller, addr, extra_env)
+    else:
+
+        def _run(controller, addr=None, extra_env=None):
+            return tmk_application(controller, addr, extra_env)
+
+    return _run
+
+
+# --- Protocol fixtures ---
+
+
 @pytest.fixture(scope="module")
-def http_tmk_application():
-    with tmk_application(controller="http", addr=":8080"):
+def http_tmk_application(tmk_run):
+    with tmk_run(controller="http", addr=":8080"):
         yield
 
 
 @pytest.fixture(scope="module")
-def modbus_tmk_application():
-    with tmk_application(controller="modbus", addr="0.0.0.0:1502"):
+def modbus_tmk_application(tmk_run):
+    with tmk_run(controller="modbus", addr="0.0.0.0:1502"):
         yield
 
 
 @pytest.fixture(scope="module")
-def modbus_tmk_application_32bit():
-    with tmk_application(
+def modbus_tmk_application_32bit(tmk_run):
+    with tmk_run(
         controller="modbus",
         addr="0.0.0.0:1503",
         extra_env={"TMK_CONTROLLERS_MODBUS_REGISTER_COUNT": "2"},
@@ -71,8 +157,8 @@ def modbus_tmk_application_32bit():
 
 
 @pytest.fixture(scope="module")
-def knx_tmk_application():
-    with tmk_application(
+def knx_tmk_application(tmk_run):
+    with tmk_run(
         controller="knx",
         addr="0.0.0.0:3671",
         extra_env={"TMK_CONTROLLERS_KNX_PUBLISH_INTERVAL": "1s"},
@@ -81,23 +167,14 @@ def knx_tmk_application():
 
 
 @pytest.fixture(scope="module")
-def mqtt_tmk_application():
-    with tmk_application(controller="mqtt", addr="localhost:1883"):
+def mqtt_tmk_application(tmk_run):
+    with tmk_run(controller="mqtt", addr="localhost:1883"):
         yield
 
 
 # --- Docker-based BACnet fixtures ---
 
 _DOCKERFILE_DUT = Path(__file__).parent / "Dockerfile.dut"
-
-
-def _get_docker_client():
-    """Get Docker client, skip tests if Docker is unavailable."""
-    try:
-        return docker.from_env()
-    except docker.errors.DockerException:
-        pytest.skip("Docker daemon not available")
-
 
 BACNET_HOST_PORT = 47808
 
@@ -132,14 +209,23 @@ def _linux_binary() -> Path:
 
 
 @pytest.fixture(scope="module")
-def bacnet_tmk_container(_linux_binary: Path):
-    """Build a FROM-scratch image from the current binary and run the BACnet DUT."""
+def bacnet_tmk_container(docker_image, request):
+    """Run the BACnet DUT — from the provided Docker image or a scratch build."""
+    if docker_image:
+        with tmk_docker_application(
+            docker_image, "bacnet", "0.0.0.0:47808"
+        ) as container:
+            yield container
+        return
+
+    # Binary mode: build a FROM-scratch image from the cross-compiled binary
+    linux_binary = request.getfixturevalue("_linux_binary")
     client = _get_docker_client()
 
     image_tag = "thermocktat:integration-test"
 
     with tempfile.TemporaryDirectory() as ctx:
-        shutil.copy(_linux_binary, Path(ctx) / "thermocktat")
+        shutil.copy(linux_binary, Path(ctx) / "thermocktat")
         shutil.copy(_DOCKERFILE_DUT, Path(ctx) / "Dockerfile")
         try:
             client.images.build(path=ctx, tag=image_tag, rm=True)
