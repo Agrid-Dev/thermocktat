@@ -101,7 +101,7 @@ jobs:
             "${IMAGE}:${VERSION}-arm64"
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v3
 
       - name: Sign image
         run: |
