@@ -66,7 +66,7 @@ jobs:
         with:
           name: thermocktat-binary
           path: .bin/thermocktat
-          retention-days: 1
+          retention-days: 7
 
   docker-build:
     needs: [test-lint-build, app-integration-tests]
@@ -110,7 +110,7 @@ jobs:
         with:
           name: image-${{ matrix.suffix }}
           path: /tmp/image-${{ matrix.suffix }}.tar
-          retention-days: 1
+          retention-days: 7
 
   docker-scan:
     needs: docker-build
@@ -236,54 +236,3 @@ jobs:
           uv run pytest test_${{ matrix.protocol }}_control.py \
             --docker-image thermocktat:ci-amd64 -v
 
-  docker-push:
-    needs: [docker-scan, app-integration-tests, docker-integration-tests]
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download image artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: /tmp/
-          pattern: image-*
-          merge-multiple: true
-
-      - name: Normalize image name
-        id: meta
-        run: |
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermocktat"
-          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
-
-      - name: Push platform images
-        run: |
-          IMAGE="${{ steps.meta.outputs.image }}"
-          TAG="pr-${{ github.event.pull_request.number }}"
-
-          for arch in amd64 arm64; do
-            skopeo copy \
-              --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
-              "docker-archive:/tmp/image-${arch}.tar" \
-              "docker://${IMAGE}:${TAG}-${arch}"
-          done
-
-      - name: Create and push manifest
-        run: |
-          IMAGE="${{ steps.meta.outputs.image }}"
-          TAG="pr-${{ github.event.pull_request.number }}"
-
-          docker buildx imagetools create \
-            -t "${IMAGE}:${TAG}" \
-            "${IMAGE}:${TAG}-amd64" \
-            "${IMAGE}:${TAG}-arm64"
