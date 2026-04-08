@@ -132,3 +132,7 @@ git push origin v0.7.0
 ```
 
 The release workflow finds the merged PR for that commit, locates the corresponding `:pr-N` image, retags it, signs it, and creates the GitHub Release.
+
+## License
+
+[MIT](LICENSE)
