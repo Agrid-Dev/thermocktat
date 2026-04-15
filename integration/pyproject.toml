@@ -11,7 +11,11 @@ dependencies = [
     "docker>=7.0.0",
     "xknx>=3.0.0",
     "pytest-asyncio>=0.25.0",
+    "thermocktat-client",
 ]
+
+[tool.uv.sources]
+thermocktat-client = { path = "../clients/python", editable = true }
 
 [dependency-groups]
 dev = [

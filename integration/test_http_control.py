@@ -2,13 +2,21 @@ import time
 
 import httpx
 import pytest
+from thermocktat_client import FanSpeed, Mode, ThermocktatSync
 
-modes: set[str] = {"fan", "heat", "cool", "auto"}
+BASE_URL = "http://localhost:8080"
 
 
 @pytest.fixture
 def http_client():
-    return httpx.Client(base_url="http://localhost:8080")
+    """Raw httpx client, still used for endpoints the SDK doesn't expose (e.g. healthz)."""
+    return httpx.Client(base_url=BASE_URL)
+
+
+@pytest.fixture
+def tmk(http_tmk_application):
+    with ThermocktatSync.connect(BASE_URL) as client:
+        yield client
 
 
 def test_healthz(http_tmk_application, http_client):
@@ -16,40 +24,35 @@ def test_healthz(http_tmk_application, http_client):
     assert response.status_code == 200
 
 
-def test_get_snapshot(http_tmk_application, http_client):
-    response = http_client.get("/v1")
-    assert response.status_code == 200
-    snapshot = response.json()
-    assert "device_id" in snapshot
-    assert isinstance(snapshot["temperature_setpoint"], (int, float))
-    assert isinstance(snapshot["enabled"], bool)
-    assert snapshot["mode"] in modes
+def test_get_snapshot(tmk):
+    assert tmk.snapshot.device_id
+    assert isinstance(tmk.snapshot.temperature_setpoint, (int, float))
+    assert isinstance(tmk.snapshot.enabled, bool)
+    assert tmk.snapshot.mode in set(Mode)
 
 
 @pytest.mark.parametrize("value", [True, False])
-def test_set_enabled(http_tmk_application, http_client, value):
-    response = http_client.post("/v1/enabled", json={"value": value})
-    assert response.status_code == 200
-    snapshot = response.json()
-    assert snapshot["enabled"] is value
+def test_set_enabled(tmk, value):
+    tmk.set_enabled(value)
+    assert tmk.snapshot.enabled is value
 
 
-def test_write_temperature_setpoint(http_tmk_application, http_client):
+def test_write_temperature_setpoint(tmk):
     setpoint = 20.0
-    write_response = http_client.post(
-        "/v1/temperature_setpoint", json={"value": setpoint}
-    )
-    assert write_response.status_code == 200
-    snapshot = write_response.json()
-    assert snapshot["temperature_setpoint"] == setpoint
+    tmk.set_temperature_setpoint(setpoint)
+    assert tmk.snapshot.temperature_setpoint == setpoint
 
 
-@pytest.mark.parametrize("mode", modes)
-def test_write_mode(http_tmk_application, http_client, mode):
-    write_response = http_client.post("/v1/mode", json={"value": mode})
-    assert write_response.status_code == 200
-    snapshot = write_response.json()
-    assert snapshot["mode"] == mode
+@pytest.mark.parametrize("mode", list(Mode))
+def test_write_mode(tmk, mode):
+    tmk.set_mode(mode)
+    assert tmk.snapshot.mode == mode
+
+
+@pytest.mark.parametrize("fan_speed", list(FanSpeed))
+def test_write_fan_speed(tmk, fan_speed):
+    tmk.set_fan_speed(fan_speed)
+    assert tmk.snapshot.fan_speed == fan_speed
 
 
 def test_custom_port_configuration(tmk_run):
@@ -60,11 +63,7 @@ def test_custom_port_configuration(tmk_run):
         extra_env={"TMK_CONTROLLERS_HTTP_ADDR": f":{custom_port}"},
     ):
         time.sleep(1)
-        with httpx.Client(base_url=custom_url) as client:
+        with ThermocktatSync.connect(custom_url) as client:
             new_setpoint = 22.5
-            response = client.post(
-                "/v1/temperature_setpoint", json={"value": new_setpoint}
-            )
-            assert response.status_code == 200
-            snapshot = response.json()
-            assert snapshot["temperature_setpoint"] == new_setpoint
+            client.set_temperature_setpoint(new_setpoint)
+            assert client.snapshot.temperature_setpoint == new_setpoint

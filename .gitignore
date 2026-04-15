@@ -2,6 +2,9 @@ coverage.out
 coverage.txt
 mosquitto.conf
 config.yaml
-thermocktat.csv
 thermocktat
 .bin/
+*.csv
+dist/
+build/
+.DS_Store
