@@ -1,0 +1,102 @@
+name: Release Python Client
+
+on:
+  push:
+    tags: ["python-client/v[0-9]*.[0-9]*.[0-9]*"]
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#python-client/v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Releasing thermocktat-client ${VERSION}"
+
+      - name: Find CI run that built this commit
+        id: ci-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Walk recent history to find the nearest ancestor with a successful
+          # CI run. For each commit we try both the commit itself and its second
+          # parent (the PR head for merge commits), since CI runs on PR branches.
+          for COMMIT in $(git log --format=%H -20); do
+            for SHA in "$COMMIT" "$(git rev-parse "${COMMIT}^2" 2>/dev/null || true)"; do
+              [ -z "$SHA" ] && continue
+              RUN_ID=$(gh run list \
+                --workflow ci-python-client.yaml \
+                --commit "$SHA" \
+                --status success \
+                --json databaseId \
+                --jq '.[0].databaseId')
+              [ -n "$RUN_ID" ] && break 2
+            done
+          done
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No successful CI run found in recent history for tag ${{ github.ref_name }}."
+            exit 1
+          fi
+          echo "Found CI run: $RUN_ID (commit: $SHA)"
+          echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: thermocktat-client-dist
+          path: dist/
+          run-id: ${{ steps.ci-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify wheel version matches tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          WHEEL=$(ls dist/*.whl)
+          # Wheel filename: thermocktat_client-<version>-py3-none-any.whl
+          WHEEL_VERSION=$(basename "$WHEEL" | awk -F- '{print $2}')
+          if [ "$WHEEL_VERSION" != "$VERSION" ]; then
+            echo "::error::Tag version ${VERSION} does not match wheel version ${WHEEL_VERSION}. Did you bump pyproject.toml?"
+            exit 1
+          fi
+          echo "Version match: ${VERSION}"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git tag --list 'python-client/v*' --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since ${PREV_TAG}" > /tmp/changelog.md
+            echo "" >> /tmp/changelog.md
+            git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD" -- clients/python >> /tmp/changelog.md
+          else
+            echo "## Initial release" > /tmp/changelog.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "thermocktat-client ${{ steps.version.outputs.version }}" \
+            --notes-file /tmp/changelog.md \
+            dist/*.whl dist/*.tar.gz
