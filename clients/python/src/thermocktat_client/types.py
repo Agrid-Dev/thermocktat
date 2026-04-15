@@ -32,3 +32,14 @@ class Snapshot:
     def from_dict(cls, data: dict[str, Any]) -> Self:
         known = {f.name for f in fields(cls)}
         return cls(**{k: v for k, v in data.items() if k in known})
+
+    def __str__(self) -> str:
+        state = "on" if self.enabled else "off"
+        return (
+            f"Thermocktat[{self.device_id}] ({state})\n"
+            f"  mode:     {self.mode.value}\n"
+            f"  fan:      {self.fan_speed.value}\n"
+            f"  setpoint: {self.temperature_setpoint}°C "
+            f"(min {self.temperature_setpoint_min}, max {self.temperature_setpoint_max})\n"
+            f"  ambient:  {self.ambient_temperature:.2f}°C"
+        )
