@@ -2,6 +2,14 @@ name: CI
 
 on:
   pull_request:
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "integration/**"
+      - "go.mod"
+      - "go.sum"
+      - "Dockerfile"
+      - ".github/workflows/ci.yaml"
   workflow_dispatch:
 
 permissions:
@@ -235,4 +243,3 @@ jobs:
           cd integration
           uv run pytest test_${{ matrix.protocol }}_control.py \
             --docker-image thermocktat:ci-amd64 -v
-
