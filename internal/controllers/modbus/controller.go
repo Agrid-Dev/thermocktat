@@ -31,7 +31,8 @@ const (
 	hrSetpointMax = 4
 	hrMode        = 6
 	hrFanSpeed    = 8
-	hrTotal       = 10 // register space size
+	hrFaultCode   = 10
+	hrTotal       = 11 // register space size
 
 	irAmbient = 0
 	irTotal   = 2
@@ -137,6 +138,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		regs[hrSetpointMax], regs[hrSetpointMax+1] = c.encodeTempToRegs(snap.TemperatureSetpointMax)
 		regs[hrMode] = uint16(snap.Mode)
 		regs[hrFanSpeed] = uint16(snap.FanSpeed)
+		regs[hrFaultCode] = uint16(snap.FaultCode)
 
 		// Serve the requested slice
 		byteCount := qty * 2
@@ -248,6 +250,8 @@ func (c *Controller) Run(ctx context.Context) error {
 			if err := c.svc.SetFanSpeed(thermostat.FanSpeed(value)); err != nil {
 				return []byte{}, &mbserver.IllegalDataValue
 			}
+		case hrFaultCode:
+			c.svc.SetFaultCode(int(value))
 		default:
 			return []byte{}, &mbserver.IllegalDataAddress
 		}
@@ -317,6 +321,9 @@ func (c *Controller) Run(ctx context.Context) error {
 				if err := c.svc.SetFanSpeed(thermostat.FanSpeed(regAt(pos))); err != nil {
 					return []byte{}, &mbserver.IllegalDataValue
 				}
+				pos++
+			case hrFaultCode:
+				c.svc.SetFaultCode(int(regAt(pos)))
 				pos++
 			default:
 				return []byte{}, &mbserver.IllegalDataAddress

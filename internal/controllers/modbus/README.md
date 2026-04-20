@@ -34,6 +34,7 @@ This controller exposes thermostat state using standard Modbus data types:
   - HR 4–5: `temperature_setpoint_max`
   - HR 6: `mode` — uint16 enum (e.g. `1 = heat`, `2 = cool`, etc.)
   - HR 8: `fan_speed` — uint16 enum
+  - HR 10: `fault_code` — uint16 integer
 
 - Input Registers (read-only)
   - IR 0–1: `ambient_temperature`
@@ -74,6 +75,7 @@ Addressing convention:
 | temperature_setpoint_max        | HR (holding)  | HR 4–5                 | 40005–40006              | 16-bit: signed int16 * 100 in HR 4. 32-bit: float32 across HR 4–5 |
 | mode                            | HR (holding)  | HR 6                   | 40007                    | uint16 enum corresponding to `thermostat.Mode` values |
 | fan_speed                       | HR (holding)  | HR 8                   | 40009                    | uint16 enum corresponding to `thermostat.FanSpeed` values |
+| fault_code                      | HR (holding)  | HR 10                  | 40011                    | uint16 integer (plain value) |
 | ambient_temperature (read-only) | IR (input)    | IR 0–1                 | 30001–30002              | 16-bit: signed int16 * 100 in IR 0. 32-bit: float32 across IR 0–1 |
 
 Scaling reminder (16-bit mode):
