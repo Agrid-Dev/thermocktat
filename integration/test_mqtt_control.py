@@ -85,3 +85,20 @@ def test_write_mode(mqtt_tmk_application, mqtt_client, mode):
     snapshot = _get_snapshot(mqtt_client, BASE_TOPIC)
     assert snapshot is not None
     assert snapshot["mode"] == mode
+
+
+def test_fault_code_defaults_to_zero(mqtt_tmk_application, mqtt_client):
+    snapshot = _get_snapshot(mqtt_client, BASE_TOPIC)
+    assert snapshot is not None
+    assert snapshot["fault_code"] == 0
+
+
+@pytest.mark.parametrize("code", [0, 1, 42, 9999])
+def test_write_fault_code(mqtt_tmk_application, mqtt_client, code):
+    mqtt_client.publish(
+        f"{BASE_TOPIC}/set/fault_code",
+        json.dumps({"value": code}).encode(),
+    )
+    snapshot = _get_snapshot(mqtt_client, BASE_TOPIC)
+    assert snapshot is not None
+    assert snapshot["fault_code"] == code

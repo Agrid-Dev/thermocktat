@@ -103,6 +103,7 @@ async def test_injected_client_is_not_closed(snapshot_response, httpx_mock: HTTP
         ("temperature_setpoint_max", 30),
         ("mode", "cool"),
         ("fan_speed", "high"),
+        ("fault_code", 7),
     ],
 )
 async def test_setters(

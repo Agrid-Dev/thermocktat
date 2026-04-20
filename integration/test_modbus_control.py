@@ -13,7 +13,8 @@ HR_TEMPERATURE_SETPOINT_MIN = 2
 HR_TEMPERATURE_SETPOINT_MAX = 4
 HR_MODE = 6
 HR_FAN_SPEED = 8
-HR_TOTAL = 10
+HR_FAULT_CODE = 10
+HR_TOTAL = 11
 
 # Input register addresses
 IR_AMBIENT_TEMPERATURE = 0
@@ -112,6 +113,25 @@ def test_write_mode(modbus_tmk_application, modbus_client, mode):
     assert not result.isError()
     read_mode = result.registers[0]
     assert read_mode == mode
+
+
+def test_fault_code_defaults_to_zero(modbus_tmk_application, modbus_client):
+    result = modbus_client.read_holding_registers(
+        HR_FAULT_CODE, count=1, device_id=DEVICE_ID
+    )
+    assert not result.isError()
+    assert result.registers[0] == 0
+
+
+@pytest.mark.parametrize("code", [0, 1, 42, 9999])
+def test_write_fault_code(modbus_tmk_application, modbus_client, code):
+    modbus_client.write_register(HR_FAULT_CODE, code, device_id=DEVICE_ID)
+    time.sleep(0.2)
+    result = modbus_client.read_holding_registers(
+        HR_FAULT_CODE, count=1, device_id=DEVICE_ID
+    )
+    assert not result.isError()
+    assert result.registers[0] == code
 
 
 # --- 32-bit mode tests ---

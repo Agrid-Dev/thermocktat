@@ -79,3 +79,6 @@ class ThermocktatSync(ThermocktatClientBase):
 
     def set_fan_speed(self, value: FanSpeed | str) -> None:
         self._set_value("fan_speed", FanSpeed(value))
+
+    def set_fault_code(self, value: int) -> None:
+        self._set_value("fault_code", value)

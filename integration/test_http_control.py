@@ -55,6 +55,16 @@ def test_write_fan_speed(tmk, fan_speed):
     assert tmk.snapshot.fan_speed == fan_speed
 
 
+def test_fault_code_defaults_to_zero(tmk):
+    assert tmk.snapshot.fault_code == 0
+
+
+@pytest.mark.parametrize("code", [0, 1, 42, 9999])
+def test_write_fault_code(tmk, code):
+    tmk.set_fault_code(code)
+    assert tmk.snapshot.fault_code == code
+
+
 def test_custom_port_configuration(tmk_run):
     custom_port = 8081
     custom_url = f"http://localhost:{custom_port}"
