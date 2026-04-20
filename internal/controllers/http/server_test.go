@@ -132,6 +132,22 @@ func TestPOST_max_setpoint(t *testing.T) {
 	_ = assertErrorResponse(t, rr)
 }
 
+func TestPOST_fault_code(t *testing.T) {
+	srv, f := newTestServer()
+
+	rr := postValueEndpoint(t, srv, "/v1/fault_code", 7)
+	assertStatus(t, rr, http.StatusOK)
+
+	if !f.SetFaultCodeCalled || f.SetFaultCodeArg != 7 {
+		t.Fatalf("expected SetFaultCode(7), got called=%v arg=%v", f.SetFaultCodeCalled, f.SetFaultCodeArg)
+	}
+
+	got := decodeJSON[map[string]any](t, rr)
+	if got["fault_code"] != float64(7) {
+		t.Fatalf("expected fault_code=7 in snapshot, got %v", got["fault_code"])
+	}
+}
+
 func TestGET_healthz(t *testing.T) {
 	srv, _ := newTestServer()
 

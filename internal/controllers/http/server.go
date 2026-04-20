@@ -33,6 +33,7 @@ func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
 	mux.HandleFunc("POST /v1/temperature_setpoint_max", s.handlePostMaxSetpoint)
 	mux.HandleFunc("POST /v1/mode", s.handlePostMode)
 	mux.HandleFunc("POST /v1/fan_speed", s.handlePostFanSpeed)
+	mux.HandleFunc("POST /v1/fault_code", s.handlePostFaultCode)
 
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -88,6 +89,7 @@ type snapshotDTO struct {
 	Mode                   string  `json:"mode"`
 	FanSpeed               string  `json:"fan_speed"`
 	AmbientTemperature     float64 `json:"ambient_temperature"`
+	FaultCode              int     `json:"fault_code"`
 }
 
 func toDTO(s thermostat.Snapshot) snapshotDTO {
@@ -99,6 +101,7 @@ func toDTO(s thermostat.Snapshot) snapshotDTO {
 		Mode:                   s.Mode.String(),
 		FanSpeed:               s.FanSpeed.String(),
 		AmbientTemperature:     s.AmbientTemperature,
+		FaultCode:              s.FaultCode,
 	}
 }
 
@@ -154,6 +157,13 @@ func (s *Server) handlePostFanSpeed(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		return s.svc.SetFanSpeed(f)
+	})
+}
+
+func (s *Server) handlePostFaultCode(w http.ResponseWriter, r *http.Request) {
+	postValue(s, w, r, func(v int) error {
+		s.svc.SetFaultCode(v)
+		return nil
 	})
 }
 

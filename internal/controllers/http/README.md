@@ -26,6 +26,7 @@ controllers:
 | Temperature Setpoint Max   | POST   | /v1/temperature_setpoint_max      | {"value": 28.0}     |
 | Mode                       | POST   | /v1/mode                          | {"value": "cool"}   |
 | Fan Speed                  | POST   | /v1/fan_speed                     | {"value": "high"}   |
+| Fault Code                 | POST   | /v1/fault_code                    | {"value": 0}        |
 
 `GET /v1`
 
@@ -43,7 +44,8 @@ Snapshot response:
   "temperature_setpoint_max": 28,
   "mode": "auto",
   "fan_speed": "auto",
-  "ambient_temperature": 21
+  "ambient_temperature": 21,
+  "fault_code": 0
 }
 ```
 
