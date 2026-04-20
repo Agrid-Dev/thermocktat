@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"time"
 
@@ -41,11 +42,15 @@ const (
 type Controller struct {
 	svc ports.ThermostatService
 	cfg Config
+	log *slog.Logger
 
 	serv *mbserver.Server
 }
 
-func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
+func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	if cfg.UnitID == 0 {
 		return nil, errors.New("modbus: UnitID is required (non-zero)")
 	}
@@ -58,7 +63,7 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	if cfg.RegisterCount != 1 && cfg.RegisterCount != 2 {
 		return nil, fmt.Errorf("modbus: RegisterCount must be 1 or 2, got %d", cfg.RegisterCount)
 	}
-	return &Controller{svc: svc, cfg: cfg}, nil
+	return &Controller{svc: svc, cfg: cfg, log: logger}, nil
 }
 
 // encodeTempToRegs encodes a temperature float64 into a pair of uint16 registers.
@@ -99,6 +104,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		start := binary.BigEndian.Uint16(data[0:2])
 		qty := binary.BigEndian.Uint16(data[2:4])
+		c.log.Debug("modbus request", "fc", 1, "start", start, "qty", qty)
 		if qty == 0 || qty > 2000 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
@@ -123,6 +129,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		start := int(binary.BigEndian.Uint16(data[0:2]))
 		qty := int(binary.BigEndian.Uint16(data[2:4]))
+		c.log.Debug("modbus request", "fc", 3, "start", start, "qty", qty)
 		if qty == 0 || qty > 125 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
@@ -158,6 +165,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		start := int(binary.BigEndian.Uint16(data[0:2]))
 		qty := int(binary.BigEndian.Uint16(data[2:4]))
+		c.log.Debug("modbus request", "fc", 4, "start", start, "qty", qty)
 		if qty == 0 || qty > 125 {
 			return []byte{}, &mbserver.IllegalDataValue
 		}
@@ -186,6 +194,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		addr := binary.BigEndian.Uint16(data[0:2])
 		value := binary.BigEndian.Uint16(data[2:4])
+		c.log.Debug("modbus request", "fc", 5, "addr", addr, "value", value)
 
 		if addr != 0 {
 			return []byte{}, &mbserver.IllegalDataAddress
@@ -217,6 +226,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		}
 		addr := binary.BigEndian.Uint16(data[0:2])
 		value := binary.BigEndian.Uint16(data[2:4])
+		c.log.Debug("modbus request", "fc", 6, "addr", addr, "value", value)
 
 		switch addr {
 		case hrSetpoint:
@@ -270,6 +280,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		start := int(binary.BigEndian.Uint16(d[0:2]))
 		quantity := int(binary.BigEndian.Uint16(d[2:4]))
 		byteCount := int(d[4])
+		c.log.Debug("modbus request", "fc", 16, "start", start, "qty", quantity)
 		if byteCount != quantity*2 || len(d) < 5+byteCount {
 			return []byte{}, &mbserver.IllegalDataValue
 		}

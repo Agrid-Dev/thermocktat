@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net"
 	"sync"
@@ -115,13 +115,17 @@ type Config struct {
 type Controller struct {
 	svc ports.ThermostatService
 	cfg Config
+	log *slog.Logger
 
 	mu   sync.Mutex
 	conn net.PacketConn
 }
 
 // New creates a BACnet controller. DeviceInstance must be in the BACnet range 0..4194303.
-func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
+func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	if cfg.DeviceID == "" {
 		return nil, errors.New("bacnet: DeviceID is required")
 	}
@@ -134,7 +138,7 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	if cfg.SyncInterval <= 0 {
 		cfg.SyncInterval = 1 * time.Second
 	}
-	return &Controller{svc: svc, cfg: cfg}, nil
+	return &Controller{svc: svc, cfg: cfg, log: logger}, nil
 }
 
 // Run starts a BACnet/IP listener and handles Who-Is, ReadProperty, and WriteProperty.
@@ -169,7 +173,7 @@ func (c *Controller) Run(ctx context.Context) error {
 				case <-ctx.Done():
 					return
 				default:
-					log.Printf("bacnet read error: %v", err)
+					c.log.Error("bacnet read error", "err", err)
 					continue
 				}
 			}
@@ -179,22 +183,28 @@ func (c *Controller) Run(ctx context.Context) error {
 
 			pkt, err := bacnet.Parse(data)
 			if err != nil {
-				log.Printf("bacnet: parse error from %s: %v", addr.String(), err)
+				c.log.Warn("bacnet parse error", "remote", addr.String(), "err", err)
 				continue
 			}
 
 			switch msg := pkt.(type) {
 			case *services.UnconfirmedWhoIs:
-				log.Printf("bacnet: Who-Is from %s — replying I-Am (device %d)", addr, c.cfg.DeviceInstance)
+				c.log.Debug("bacnet who-is",
+					"remote", addr.String(),
+					"device_instance", c.cfg.DeviceInstance,
+				)
 				if err := c.respondIAm(addr); err != nil {
-					log.Printf("bacnet: I-Am error: %v", err)
+					c.log.Error("bacnet i-am send failed", "err", err)
 				}
 			case *services.ConfirmedReadProperty:
 				c.handleReadProperty(msg, addr)
 			case *services.ConfirmedWriteProperty:
 				c.handleWriteProperty(msg, addr)
 			default:
-				log.Printf("bacnet: unsupported service from %s: %T", addr, pkt)
+				c.log.Warn("bacnet unsupported service",
+					"remote", addr.String(),
+					"type", fmt.Sprintf("%T", pkt),
+				)
 			}
 		}
 	}()
@@ -305,11 +315,16 @@ func decodeReal(payload objects.APDUPayload) (float32, error) {
 func (c *Controller) handleReadProperty(msg *services.ConfirmedReadProperty, addr net.Addr) {
 	dec, err := decodeReadProperty(msg)
 	if err != nil {
-		log.Printf("bacnet: ReadProperty decode error: %v", err)
+		c.log.Warn("bacnet read_property decode failed", "err", err)
 		c.sendError(addr, msg.APDU.InvokeID, services.ServiceConfirmedReadProperty,
 			objects.ErrorClassService, objects.ErrorCodeServiceRequestDenied)
 		return
 	}
+	c.log.Debug("bacnet read_property",
+		"object_type", dec.ObjectType,
+		"instance", dec.InstanceId,
+		"property", dec.PropertyId,
+	)
 
 	if dec.PropertyId != objects.PropertyIdPresentValue {
 		c.sendError(addr, msg.APDU.InvokeID, services.ServiceConfirmedReadProperty,
@@ -334,11 +349,17 @@ func (c *Controller) handleReadProperty(msg *services.ConfirmedReadProperty, add
 func (c *Controller) handleWriteProperty(msg *services.ConfirmedWriteProperty, addr net.Addr) {
 	dec, err := decodeWriteProperty(msg)
 	if err != nil {
-		log.Printf("bacnet: WriteProperty decode error: %v", err)
+		c.log.Warn("bacnet write_property decode failed", "err", err)
 		c.sendError(addr, msg.APDU.InvokeID, services.ServiceConfirmedWriteProperty,
 			objects.ErrorClassService, objects.ErrorCodeServiceRequestDenied)
 		return
 	}
+	c.log.Debug("bacnet write_property",
+		"object_type", dec.ObjectType,
+		"instance", dec.InstanceId,
+		"property", dec.PropertyId,
+		"value", dec.Value,
+	)
 
 	if dec.PropertyId != objects.PropertyIdPresentValue {
 		c.sendError(addr, msg.APDU.InvokeID, services.ServiceConfirmedWriteProperty,
@@ -360,7 +381,7 @@ func (c *Controller) handleWriteProperty(msg *services.ConfirmedWriteProperty, a
 	}
 
 	if err := prop.write(c.svc, dec.Value); err != nil {
-		log.Printf("bacnet: WriteProperty apply error: %v", err)
+		c.log.Warn("bacnet write_property apply failed", "err", err)
 		c.sendError(addr, msg.APDU.InvokeID, services.ServiceConfirmedWriteProperty,
 			objects.ErrorClassService, objects.ErrorCodeServiceRequestDenied)
 		return
@@ -408,11 +429,11 @@ func (c *Controller) sendComplexACK(addr net.Addr, invokeID uint8, objType uint1
 
 	b, err := cack.MarshalBinary()
 	if err != nil {
-		log.Printf("bacnet: ComplexACK marshal error: %v", err)
+		c.log.Error("bacnet complex_ack marshal failed", "err", err)
 		return
 	}
 	if err := c.send(b, addr); err != nil {
-		log.Printf("bacnet: ComplexACK send error: %v", err)
+		c.log.Error("bacnet complex_ack send failed", "err", err)
 	}
 }
 
@@ -429,11 +450,11 @@ func (c *Controller) sendSimpleACK(addr net.Addr, invokeID uint8, service uint8)
 
 	b, err := sack.MarshalBinary()
 	if err != nil {
-		log.Printf("bacnet: SimpleACK marshal error: %v", err)
+		c.log.Error("bacnet simple_ack marshal failed", "err", err)
 		return
 	}
 	if err := c.send(b, addr); err != nil {
-		log.Printf("bacnet: SimpleACK send error: %v", err)
+		c.log.Error("bacnet simple_ack send failed", "err", err)
 	}
 }
 
@@ -451,11 +472,11 @@ func (c *Controller) sendError(addr net.Addr, invokeID uint8, service uint8, err
 
 	b, err := e.MarshalBinary()
 	if err != nil {
-		log.Printf("bacnet: Error marshal error: %v", err)
+		c.log.Error("bacnet error marshal failed", "err", err)
 		return
 	}
 	if err := c.send(b, addr); err != nil {
-		log.Printf("bacnet: Error send error: %v", err)
+		c.log.Error("bacnet error send failed", "err", err)
 	}
 }
 

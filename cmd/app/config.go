@@ -18,6 +18,7 @@ import (
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
 
+	"github.com/Agrid-Dev/thermocktat/internal/logging"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
@@ -44,6 +45,7 @@ type Config struct {
 	Thermostat ThermostatConfig `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
 	Regulator  RegulatorConfig  `koanf:"regulator" json:"regulator" yaml:"regulator"`
 	HeatLoss   HeatLossConfig   `koanf:"heat_loss" json:"heat_loss" yaml:"heat_loss"`
+	Logging    logging.Config   `koanf:"logging" json:"logging" yaml:"logging"`
 }
 
 type ThermostatConfig struct {
@@ -239,6 +241,14 @@ func envKeyTransform(k string) string {
 		}
 		field := strings.Join(parts[2:], "_")
 		return "heat_loss." + field
+
+	case "logging":
+		// logging_<field> -> logging.<field>
+		if len(parts) < 2 {
+			return key
+		}
+		field := strings.Join(parts[1:], "_")
+		return "logging." + field
 
 	default:
 		// top-level keys keep underscores (device_id, controller, addr, etc.)

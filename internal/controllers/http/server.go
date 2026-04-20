@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,12 +17,16 @@ type Server struct {
 	svc      ports.ThermostatService
 	srv      *http.Server
 	deviceID string
+	log      *slog.Logger
 }
 
 // New returns a runnable server.
-func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
+func New(svc ports.ThermostatService, addr string, deviceID string, logger *slog.Logger) *Server {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	mux := http.NewServeMux()
-	s := &Server{svc: svc, deviceID: deviceID}
+	s := &Server{svc: svc, deviceID: deviceID, log: logger}
 
 	// Read
 	mux.HandleFunc("GET /v1", s.handleGet)
@@ -50,10 +55,33 @@ func New(svc ports.ThermostatService, addr string, deviceID string) *Server {
 
 	s.srv = &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           logRequest(logger, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	return s
+}
+
+// logRequest wraps an http.Handler to emit a debug line per request.
+func logRequest(log *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, r)
+		log.Debug("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", sw.status,
+		)
+	})
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (sw *statusWriter) WriteHeader(code int) {
+	sw.status = code
+	sw.ResponseWriter.WriteHeader(code)
 }
 
 func (s *Server) Run(ctx context.Context) error {

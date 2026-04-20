@@ -36,6 +36,10 @@ func NewPIDRegulator(params PIDRegulatorParams) *PIDRegulator {
 	}
 }
 
+func (pid *PIDRegulator) activation() (heating, cooling bool) {
+	return pid.isHeating, pid.isCooling
+}
+
 func (pid *PIDRegulator) setActivation(heating, cooling bool) {
 	if pid.isHeating == heating && pid.isCooling == cooling {
 		return

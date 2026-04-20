@@ -44,7 +44,7 @@ func startController(t *testing.T, opts ...func(*testutil.FakeThermostatService)
 		DeviceID:       "test-dev",
 		DeviceInstance: 42,
 		Addr:           addr,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

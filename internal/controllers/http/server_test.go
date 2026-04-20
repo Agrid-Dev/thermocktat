@@ -166,7 +166,7 @@ func TestGET_healthz(t *testing.T) {
 func newTestServer() (*Server, *testutil.FakeThermostatService) {
 	f := testutil.NewFakeThermostatService()
 	deviceID := "default"
-	return New(f, ":0", deviceID), f
+	return New(f, ":0", deviceID, nil), f
 }
 
 func doJSONRequest(t *testing.T, h http.Handler, method, path string, body any) *httptest.ResponseRecorder {

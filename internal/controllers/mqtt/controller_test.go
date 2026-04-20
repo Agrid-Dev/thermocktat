@@ -90,7 +90,7 @@ func newDefaultSvc() *testutil.FakeThermostatService {
 
 func TestNewDefaults(t *testing.T) {
 	svc := newDefaultSvc()
-	c, err := New(svc, Config{DeviceID: "room101"})
+	c, err := New(svc, Config{DeviceID: "room101"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,18 +112,18 @@ func TestNewDefaults(t *testing.T) {
 func TestNewValidation(t *testing.T) {
 	svc := newDefaultSvc()
 
-	if _, err := New(svc, Config{}); err == nil {
+	if _, err := New(svc, Config{}, nil); err == nil {
 		t.Fatal("expected error when DeviceID missing")
 	}
 
-	if _, err := New(svc, Config{DeviceID: "x", QoS: 2}); err == nil {
+	if _, err := New(svc, Config{DeviceID: "x", QoS: 2}, nil); err == nil {
 		t.Fatal("expected error when QoS > 1")
 	}
 }
 
 func TestTopicJoin(t *testing.T) {
 	svc := newDefaultSvc()
-	c, err := New(svc, Config{DeviceID: "room101", BaseTopic: "thermocktat/room101/"})
+	c, err := New(svc, Config{DeviceID: "room101", BaseTopic: "thermocktat/room101/"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestDecodeValueStrict(t *testing.T) {
 
 func TestOnMessage_IgnoresWrongPrefix(t *testing.T) {
 	svc := newDefaultSvc()
-	c, err := New(svc, Config{DeviceID: "room101"})
+	c, err := New(svc, Config{DeviceID: "room101"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestOnMessage_IgnoresWrongPrefix(t *testing.T) {
 
 func TestOnMessage_Enabled(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
@@ -199,7 +199,7 @@ func TestOnMessage_Enabled(t *testing.T) {
 
 func TestOnMessage_Setpoint(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 
@@ -218,7 +218,7 @@ func TestOnMessage_MinMax(t *testing.T) {
 	svc.S.TemperatureSetpointMin = 10
 	svc.S.TemperatureSetpointMax = 30
 
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 
@@ -238,7 +238,7 @@ func TestOnMessage_MaxMin(t *testing.T) {
 	svc.S.TemperatureSetpointMin = 10
 	svc.S.TemperatureSetpointMax = 30
 
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
@@ -254,7 +254,7 @@ func TestOnMessage_MaxMin(t *testing.T) {
 
 func TestOnMessage_Mode(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
@@ -269,7 +269,7 @@ func TestOnMessage_Mode(t *testing.T) {
 
 func TestOnMessage_ModeInvalid_DoesNotCallService(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 
@@ -285,7 +285,7 @@ func TestOnMessage_ModeInvalid_DoesNotCallService(t *testing.T) {
 
 func TestOnMessage_FanSpeed(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
@@ -300,7 +300,7 @@ func TestOnMessage_FanSpeed(t *testing.T) {
 
 func TestOnMessage_FaultCode(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
@@ -315,7 +315,7 @@ func TestOnMessage_FaultCode(t *testing.T) {
 
 func TestOnMessage_FanSpeedInvalid_DoesNotCallService(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 
@@ -331,7 +331,7 @@ func TestOnMessage_FanSpeedInvalid_DoesNotCallService(t *testing.T) {
 
 func TestPublishSnapshot_PublishesJSON(t *testing.T) {
 	svc := newDefaultSvc()
-	c, _ := New(svc, Config{DeviceID: "room101", QoS: 1, RetainSnapshot: true})
+	c, _ := New(svc, Config{DeviceID: "room101", QoS: 1, RetainSnapshot: true}, nil)
 
 	fc := &fakeClient{}
 	c.client = fc
@@ -366,7 +366,7 @@ func TestPublishSnapshot_PublishesJSON(t *testing.T) {
 func TestOnMessage_ServiceError_IsIgnored(t *testing.T) {
 	svc := newDefaultSvc()
 	svc.SetSetpointErr = errors.New("boom")
-	c, _ := New(svc, Config{DeviceID: "room101"})
+	c, _ := New(svc, Config{DeviceID: "room101"}, nil)
 	fc := &fakeClient{}
 	c.client = fc
 	c.onMessage(nil, fakeMessage{
