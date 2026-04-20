@@ -279,6 +279,27 @@ def test_write_enabled(bacnet_tmk_container, bacnet_socket):
     assert is_simple_ack(resp)
 
 
+def test_read_fault_code_default(bacnet_tmk_container, bacnet_socket):
+    pkt = build_read_property(OBJ_ANALOG_VALUE, 3, PROP_PRESENT_VALUE)
+    resp = send_recv(bacnet_socket, pkt)
+    assert not is_error(resp)
+    val = parse_complex_ack_value(resp)
+    assert val == 0.0
+
+
+@pytest.mark.parametrize("code", [0, 1, 42, 9999])
+def test_write_fault_code(bacnet_tmk_container, bacnet_socket, code):
+    pkt = build_write_property(OBJ_ANALOG_VALUE, 3, PROP_PRESENT_VALUE, float(code))
+    resp = send_recv(bacnet_socket, pkt)
+    assert is_simple_ack(resp)
+
+    pkt = build_read_property(OBJ_ANALOG_VALUE, 3, PROP_PRESENT_VALUE)
+    resp = send_recv(bacnet_socket, pkt)
+    assert not is_error(resp)
+    val = parse_complex_ack_value(resp)
+    assert int(val) == code
+
+
 @pytest.mark.parametrize("mode", [1, 2, 3, 4])  # heat, cool, fan, auto
 def test_write_mode(bacnet_tmk_container, bacnet_socket, mode):
     pkt = build_write_property(

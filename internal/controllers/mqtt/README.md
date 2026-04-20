@@ -43,7 +43,8 @@ Example:
   "temperature_setpoint_max": 28,
   "mode": "auto",
   "fan_speed": "auto",
-  "ambient_temperature": 21
+  "ambient_temperature": 21,
+  "fault_code": 0
 }
 ```
 
@@ -61,6 +62,7 @@ Publish a message to topic `{base_topic}/get/snapshot` to trigger a snapshot pub
 | `maxtemperature_setpoint_max` | number | `28` |
 | `mode` | string | `"heat"` |
 | `fan_speed` | string | `"high"` |
+| `fault_code` | int | `0` |
 
 To update an attribute, publish to `{base_topic}/set/{attribute}` and add the target value under the `value` field of the message payload. No other fields than `value` are allowed.
 

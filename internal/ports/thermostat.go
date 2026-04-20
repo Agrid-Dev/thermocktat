@@ -10,4 +10,5 @@ type ThermostatService interface {
 	SetMinMax(min, max float64) error
 	SetMode(thermostat.Mode) error
 	SetFanSpeed(thermostat.FanSpeed) error
+	SetFaultCode(int)
 }

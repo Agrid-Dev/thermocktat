@@ -79,3 +79,6 @@ class ThermocktatAsync(ThermocktatClientBase):
 
     async def set_fan_speed(self, value: FanSpeed | str) -> None:
         await self._set_value("fan_speed", FanSpeed(value))
+
+    async def set_fault_code(self, value: int) -> None:
+        await self._set_value("fault_code", value)

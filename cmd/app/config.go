@@ -56,6 +56,8 @@ type ThermostatConfig struct {
 
 	Mode     *string `koanf:"mode" json:"mode" yaml:"mode"`                // "heat" | "cool" | "fan" | "auto"
 	FanSpeed *string `koanf:"fan_speed" json:"fan_speed" yaml:"fan_speed"` // "auto" | "low" | "medium" | "high"
+
+	FaultCode *int `koanf:"fault_code" json:"fault_code" yaml:"fault_code"`
 }
 
 type RegulatorConfig struct {
@@ -332,6 +334,7 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 	max := 28.0
 	modeStr := "auto"
 	fanStr := "auto"
+	faultCode := 0
 
 	// Apply overrides if set
 	if c.Thermostat.Enabled != nil {
@@ -355,6 +358,9 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 	if c.Thermostat.FanSpeed != nil {
 		fanStr = *c.Thermostat.FanSpeed
 	}
+	if c.Thermostat.FaultCode != nil {
+		faultCode = *c.Thermostat.FaultCode
+	}
 
 	mode, err := thermostat.ParseMode(modeStr)
 	if err != nil {
@@ -373,6 +379,7 @@ func (c Config) Snapshot() (thermostat.Snapshot, error) {
 		Mode:                   mode,
 		FanSpeed:               fan,
 		AmbientTemperature:     ambient,
+		FaultCode:              faultCode,
 	}, nil
 }
 

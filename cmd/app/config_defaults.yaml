@@ -35,6 +35,7 @@ thermostat:
   temperature_setpoint_max: 28.0
   mode: "auto"
   fan_speed: "auto"
+  fault_code: 0
 
 regulator:
   interval: 1s

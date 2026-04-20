@@ -39,6 +39,7 @@ Only `PresentValue` (property ID 85) is supported. Requests for other properties
 | Analog Value (2) | 0 | `temperature_setpoint` | Read / Write |
 | Analog Value (2) | 1 | `temperature_setpoint_min` | Read / Write |
 | Analog Value (2) | 2 | `temperature_setpoint_max` | Read / Write |
+| Analog Value (2) | 3 | `fault_code` | Read / Write |
 | Binary Value (5) | 0 | `enabled` | Read / Write |
 | Multi-State Value (19) | 0 | `mode` | Read / Write |
 | Multi-State Value (19) | 1 | `fan_speed` | Read / Write |
@@ -46,6 +47,7 @@ Only `PresentValue` (property ID 85) is supported. Requests for other properties
 ### Value encoding
 
 - **Temperatures** (AI:0, AV:0, AV:1, AV:2): IEEE 754 float32 in degrees Celsius.
+- **Fault Code** (AV:3): integer transported as float32 (truncated to int on write).
 - **Enabled** (BV:0): `1.0` = active, `0.0` = inactive.
 - **Mode** (MSV:0): `1` = heat, `2` = cool, `3` = fan, `4` = auto.
 - **Fan Speed** (MSV:1): `1` = auto, `2` = low, `3` = medium, `4` = high.

@@ -16,6 +16,7 @@ GA_SETPOINT_MAX = GroupAddress("1/0/3")
 GA_AMBIENT_TEMPERATURE = GroupAddress("1/0/4")
 GA_MODE = GroupAddress("1/0/5")
 GA_FAN_SPEED = GroupAddress("1/0/6")
+GA_FAULT_CODE = GroupAddress("1/0/7")
 
 # Thermostat enum values (same as Go internal enums, same as Modbus)
 MODE_HEAT = 1
@@ -259,6 +260,37 @@ async def test_write_mode(knx_tmk_application, mode):
         payload = await _read_ga(xknx, GA_MODE)
         assert isinstance(payload, DPTArray)
         assert payload.value == (mode,)
+    finally:
+        await xknx.stop()
+
+
+@pytest.mark.asyncio
+async def test_read_fault_code_default(knx_tmk_application):
+    """Read fault_code (DPT 7.001) — default is 0."""
+    xknx = XKNX(connection_config=_connection_config())
+    await xknx.start()
+    try:
+        payload = await _read_ga(xknx, GA_FAULT_CODE)
+        assert isinstance(payload, DPTArray)
+        value = (payload.value[0] << 8) | payload.value[1]
+        assert value == 0
+    finally:
+        await xknx.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", [0, 1, 42, 9999])
+async def test_write_fault_code(knx_tmk_application, code):
+    """Write fault_code (DPT 7.001) and read back."""
+    xknx = XKNX(connection_config=_connection_config())
+    await xknx.start()
+    try:
+        payload = DPTArray(((code >> 8) & 0xFF, code & 0xFF))
+        await _write_ga(xknx, GA_FAULT_CODE, payload)
+        received = await _read_ga(xknx, GA_FAULT_CODE)
+        assert isinstance(received, DPTArray)
+        value = (received.value[0] << 8) | received.value[1]
+        assert value == code
     finally:
         await xknx.stop()
 

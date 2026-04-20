@@ -11,6 +11,7 @@ def make_snapshot(**overrides) -> Snapshot:
         "temperature_setpoint_max": 28.0,
         "mode": Mode.AUTO,
         "fan_speed": FanSpeed.AUTO,
+        "fault_code": 0,
     }
     return Snapshot(**(defaults | overrides))
 

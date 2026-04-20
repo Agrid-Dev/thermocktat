@@ -12,4 +12,5 @@ def snapshot_response() -> dict:
         "mode": "auto",
         "fan_speed": "auto",
         "ambient_temperature": 20.98131495252262,
+        "fault_code": 0,
     }

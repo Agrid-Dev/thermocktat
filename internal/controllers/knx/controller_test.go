@@ -409,6 +409,52 @@ func TestWriteFanSpeed(t *testing.T) {
 	}
 }
 
+func TestReadFaultCode(t *testing.T) {
+	_, conn, cleanup := startController(t, func(f *testutil.FakeThermostatService) {
+		f.S.FaultCode = 513 // spans both bytes (0x0201)
+	})
+	defer cleanup()
+
+	ch := connect(t, conn)
+	var seq uint8
+
+	ga := GroupAddress(1, 0, SubFaultCode)
+	resp := readGA(t, conn, ch, &seq, ga)
+	raw, _, err := ExtractGroupValueResponseData(resp)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(raw) != 2 {
+		t.Fatalf("expected 2 bytes, got %d", len(raw))
+	}
+	got := int(uint16(raw[0])<<8 | uint16(raw[1]))
+	if got != 513 {
+		t.Fatalf("fault_code: got %d, want 513", got)
+	}
+}
+
+func TestWriteFaultCode(t *testing.T) {
+	_, conn, cleanup := startController(t, nil)
+	defer cleanup()
+
+	ch := connect(t, conn)
+	var seq uint8
+
+	ga := GroupAddress(1, 0, SubFaultCode)
+	writeGA(t, conn, ch, &seq, ga, []byte{0x00, 0x2A}, false)
+
+	// Verify via read-back.
+	resp := readGA(t, conn, ch, &seq, ga)
+	raw, _, err := ExtractGroupValueResponseData(resp)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := int(uint16(raw[0])<<8 | uint16(raw[1]))
+	if got != 42 {
+		t.Fatalf("fault_code: got %d, want 42", got)
+	}
+}
+
 func TestWriteReadBack(t *testing.T) {
 	_, conn, cleanup := startController(t, nil)
 	defer cleanup()

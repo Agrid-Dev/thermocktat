@@ -19,11 +19,12 @@ type spyThermostatService struct {
 	s  thermostat.Snapshot
 
 	// record calls
-	setEnabledCalls  []bool
-	setSetpointCalls []float64
-	setMinMaxCalls   [][2]float64
-	setModeCalls     []thermostat.Mode
-	setFanCalls      []thermostat.FanSpeed
+	setEnabledCalls   []bool
+	setSetpointCalls  []float64
+	setMinMaxCalls    [][2]float64
+	setModeCalls      []thermostat.Mode
+	setFanCalls       []thermostat.FanSpeed
+	setFaultCodeCalls []int
 }
 
 func (f *spyThermostatService) Get() thermostat.Snapshot {
@@ -65,6 +66,12 @@ func (f *spyThermostatService) SetFanSpeed(ff thermostat.FanSpeed) error {
 	f.s.FanSpeed = ff
 	f.setFanCalls = append(f.setFanCalls, ff)
 	return nil
+}
+func (f *spyThermostatService) SetFaultCode(code int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.s.FaultCode = code
+	f.setFaultCodeCalls = append(f.setFaultCodeCalls, code)
 }
 
 func findFreeTCPAddr(t *testing.T) string {
@@ -117,13 +124,13 @@ func TestModbusControllerHandlers(t *testing.T) {
 	defer handler.Close()
 	client := modbus.NewClient(handler)
 
-	// Read holding registers 0..9 (hrTotal=10)
-	res, err := client.ReadHoldingRegisters(0, 10)
+	// Read holding registers 0..hrTotal-1
+	res, err := client.ReadHoldingRegisters(0, hrTotal)
 	if err != nil {
 		t.Fatalf("read holding: %v", err)
 	}
-	if len(res) != 20 {
-		t.Fatalf("expected 20 bytes got %d", len(res))
+	if len(res) != 2*hrTotal {
+		t.Fatalf("expected %d bytes got %d", 2*hrTotal, len(res))
 	}
 	get := func(i int) uint16 { return binary.BigEndian.Uint16(res[i*2 : i*2+2]) }
 	if get(hrSetpoint) != encodeTemp(fs.s.TemperatureSetpoint) {
@@ -140,6 +147,9 @@ func TestModbusControllerHandlers(t *testing.T) {
 	}
 	if get(hrFanSpeed) != uint16(fs.s.FanSpeed) {
 		t.Fatalf("fan_speed mismatch")
+	}
+	if get(hrFaultCode) != uint16(fs.s.FaultCode) {
+		t.Fatalf("fault_code mismatch")
 	}
 
 	// Write setpoint via function 6 (register address hrSetpoint=0)
@@ -164,6 +174,18 @@ func TestModbusControllerHandlers(t *testing.T) {
 	if len(fs.setModeCalls) == 0 || fs.setModeCalls[len(fs.setModeCalls)-1] != thermostat.ModeHeat {
 		fs.mu.Unlock()
 		t.Fatalf("setMode not called")
+	}
+	fs.mu.Unlock()
+
+	// Write fault_code via function 6
+	if _, err := client.WriteSingleRegister(hrFaultCode, 42); err != nil {
+		t.Fatalf("write fault_code: %v", err)
+	}
+	time.Sleep(SyncInterval)
+	fs.mu.Lock()
+	if len(fs.setFaultCodeCalls) == 0 || fs.setFaultCodeCalls[len(fs.setFaultCodeCalls)-1] != 42 {
+		fs.mu.Unlock()
+		t.Fatalf("setFaultCode not called")
 	}
 	fs.mu.Unlock()
 

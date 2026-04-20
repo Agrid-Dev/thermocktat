@@ -29,8 +29,8 @@ func TestBuildBindingMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(m) != 7 {
-		t.Fatalf("expected 7 bindings, got %d", len(m))
+	if len(m) != 8 {
+		t.Fatalf("expected 8 bindings, got %d", len(m))
 	}
 
 	// Verify enabled is compact (DPTSize=0).

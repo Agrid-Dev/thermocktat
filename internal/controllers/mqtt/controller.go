@@ -145,6 +145,7 @@ func (c *Controller) publishSnapshot() {
 		Mode:                   s.Mode.String(),
 		FanSpeed:               s.FanSpeed.String(),
 		AmbientTemperature:     s.AmbientTemperature,
+		FaultCode:              s.FaultCode,
 		DeviceId:               c.cfg.DeviceID,
 	}
 
@@ -160,6 +161,7 @@ type snapshotDTO struct {
 	Mode                   string  `json:"mode"`
 	FanSpeed               string  `json:"fan_speed"`
 	AmbientTemperature     float64 `json:"ambient_temperature"`
+	FaultCode              int     `json:"fault_code"`
 	DeviceId               string  `json:"device_id"`
 }
 
@@ -238,6 +240,13 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 				return
 			}
 			_ = c.svc.SetFanSpeed(f)
+
+		case "fault_code":
+			v, err := decodeValueStrict[int](payload)
+			if err != nil {
+				return
+			}
+			c.svc.SetFaultCode(v)
 		}
 		c.publishSnapshot()
 	}
