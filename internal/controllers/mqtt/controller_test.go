@@ -298,6 +298,21 @@ func TestOnMessage_FanSpeed(t *testing.T) {
 	}
 }
 
+func TestOnMessage_FaultCode(t *testing.T) {
+	svc := newDefaultSvc()
+	c, _ := New(svc, Config{DeviceID: "room101"})
+	fc := &fakeClient{}
+	c.client = fc
+	c.onMessage(nil, fakeMessage{
+		topic:   "thermocktat/room101/set/fault_code",
+		payload: []byte(`{"value":9}`),
+	})
+
+	if !svc.SetFaultCodeCalled || svc.SetFaultCodeArg != 9 {
+		t.Fatalf("expected SetFaultCode(9), got called=%v arg=%v", svc.SetFaultCodeCalled, svc.SetFaultCodeArg)
+	}
+}
+
 func TestOnMessage_FanSpeedInvalid_DoesNotCallService(t *testing.T) {
 	svc := newDefaultSvc()
 	c, _ := New(svc, Config{DeviceID: "room101"})
