@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -47,11 +47,15 @@ type Config struct {
 type Controller struct {
 	svc ports.ThermostatService
 	cfg Config
+	log *slog.Logger
 
 	client mqtt.Client
 }
 
-func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
+func New(logger *slog.Logger, svc ports.ThermostatService, cfg Config) (*Controller, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	if cfg.BrokerURL == "" {
 		cfg.BrokerURL = "tcp://localhost:1883"
 	}
@@ -80,6 +84,7 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 	return &Controller{
 		svc: svc,
 		cfg: cfg,
+		log: logger,
 	}, nil
 }
 
@@ -98,7 +103,10 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	// Subscribe when connected/reconnected.
 	opts.OnConnect = func(cl mqtt.Client) {
-		log.Printf("Connected to MQTT broker with base topic: %s, publish mode %s", c.cfg.BaseTopic, c.cfg.PublishMode)
+		c.log.Info("mqtt broker connected",
+			"base_topic", c.cfg.BaseTopic,
+			"publish_mode", c.cfg.PublishMode,
+		)
 		topicSet := c.topic("set/+")
 		tokenSet := cl.Subscribe(topicSet, c.cfg.QoS, c.onMessage)
 		tokenSet.Wait()
@@ -173,7 +181,7 @@ type valueReq[T any] struct {
 func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 	// topic format: <base>/set/<field>
 	t := msg.Topic()
-	log.Printf("Received message on topic: %s", msg.Topic())
+	c.log.Debug("mqtt message received", "topic", t, "payload_len", len(msg.Payload()))
 	// Request: <base>/get/<what>
 	if what, ok := strings.CutPrefix(t, c.cfg.BaseTopic+"/get/"); ok {
 		switch what {
@@ -192,6 +200,7 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 		case "enabled":
 			v, err := decodeValueStrict[bool](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			c.svc.SetEnabled(v)
@@ -199,51 +208,69 @@ func (c *Controller) onMessage(_ mqtt.Client, msg mqtt.Message) {
 		case "temperature_setpoint":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
-			_ = c.svc.SetSetpoint(v)
+			if err := c.svc.SetSetpoint(v); err != nil {
+				c.log.Warn("mqtt set failed", "field", field, "err", err)
+			}
 
 		case "temperature_setpoint_min":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			cur := c.svc.Get()
-			_ = c.svc.SetMinMax(v, cur.TemperatureSetpointMax)
+			if err := c.svc.SetMinMax(v, cur.TemperatureSetpointMax); err != nil {
+				c.log.Warn("mqtt set failed", "field", field, "err", err)
+			}
 
 		case "temperature_setpoint_max":
 			v, err := decodeValueStrict[float64](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			cur := c.svc.Get()
-			_ = c.svc.SetMinMax(cur.TemperatureSetpointMin, v)
+			if err := c.svc.SetMinMax(cur.TemperatureSetpointMin, v); err != nil {
+				c.log.Warn("mqtt set failed", "field", field, "err", err)
+			}
 
 		case "mode":
 			s, err := decodeValueStrict[string](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			m, err := thermostat.ParseMode(s)
 			if err != nil {
+				c.log.Warn("mqtt parse failed", "field", field, "value", s, "err", err)
 				return
 			}
-			_ = c.svc.SetMode(m)
+			if err := c.svc.SetMode(m); err != nil {
+				c.log.Warn("mqtt set failed", "field", field, "err", err)
+			}
 
 		case "fan_speed":
 			s, err := decodeValueStrict[string](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			f, err := thermostat.ParseFanSpeed(s)
 			if err != nil {
+				c.log.Warn("mqtt parse failed", "field", field, "value", s, "err", err)
 				return
 			}
-			_ = c.svc.SetFanSpeed(f)
+			if err := c.svc.SetFanSpeed(f); err != nil {
+				c.log.Warn("mqtt set failed", "field", field, "err", err)
+			}
 
 		case "fault_code":
 			v, err := decodeValueStrict[int](payload)
 			if err != nil {
+				c.log.Warn("mqtt decode failed", "field", field, "err", err)
 				return
 			}
 			c.svc.SetFaultCode(v)

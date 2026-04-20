@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
@@ -34,6 +34,7 @@ type Controller struct {
 	svc      ports.ThermostatService
 	cfg      Config
 	bindings map[uint16]Binding
+	log      *slog.Logger
 
 	mu     sync.Mutex
 	conn   net.PacketConn
@@ -41,7 +42,10 @@ type Controller struct {
 }
 
 // New creates a new KNX controller.
-func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
+func New(logger *slog.Logger, svc ports.ThermostatService, cfg Config) (*Controller, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = "0.0.0.0:3671"
 	}
@@ -58,6 +62,7 @@ func New(svc ports.ThermostatService, cfg Config) (*Controller, error) {
 		svc:      svc,
 		cfg:      cfg,
 		bindings: bindings,
+		log:      logger,
 	}, nil
 }
 
@@ -122,9 +127,13 @@ func (c *Controller) LocalAddr() net.Addr {
 func (c *Controller) handlePacket(data []byte, addr net.Addr) {
 	hdr, err := ParseHeader(data)
 	if err != nil {
-		log.Printf("knx: invalid header from %v: %v", addr, err)
+		c.log.Warn("knx invalid header", "remote", addr.String(), "err", err)
 		return
 	}
+	c.log.Debug("knx packet received",
+		"remote", addr.String(),
+		"service", fmt.Sprintf("0x%04X", hdr.ServiceType),
+	)
 
 	body := data[headerSize:]
 
@@ -140,20 +149,23 @@ func (c *Controller) handlePacket(data []byte, addr net.Addr) {
 	case ServiceTunnelingACK:
 		// Client ACKs our pushed TUNNELING_REQUESTs — nothing to do.
 	default:
-		log.Printf("knx: unsupported service 0x%04X from %v", hdr.ServiceType, addr)
+		c.log.Warn("knx unsupported service",
+			"remote", addr.String(),
+			"service", fmt.Sprintf("0x%04X", hdr.ServiceType),
+		)
 	}
 }
 
 func (c *Controller) handleConnect(body []byte, addr net.Addr) {
 	// CONNECT_REQUEST body: HPAI(control, 8) + HPAI(data, 8) + CRI(4)
 	if len(body) < 20 {
-		log.Printf("knx: connect request too short from %v", addr)
+		c.log.Warn("knx connect request too short", "remote", addr.String())
 		return
 	}
 
 	controlHPAI, err := ParseHPAI(body[0:8])
 	if err != nil {
-		log.Printf("knx: bad control HPAI: %v", err)
+		c.log.Warn("knx bad control HPAI", "err", err)
 		return
 	}
 
@@ -255,7 +267,7 @@ func (c *Controller) handleDisconnect(body []byte, addr net.Addr) {
 func (c *Controller) handleTunneling(body []byte, _ net.Addr) {
 	channelID, seq, err := ParseTunnelingHeader(body)
 	if err != nil {
-		log.Printf("knx: bad tunneling header: %v", err)
+		c.log.Warn("knx bad tunneling header", "err", err)
 		return
 	}
 
@@ -276,7 +288,7 @@ func (c *Controller) handleTunneling(body []byte, _ net.Addr) {
 	cemiData := body[4:]
 	cemi, err := ParseCEMI(cemiData)
 	if err != nil {
-		log.Printf("knx: bad CEMI: %v", err)
+		c.log.Warn("knx bad cemi", "err", err)
 		return
 	}
 
@@ -290,9 +302,13 @@ func (c *Controller) handleTunneling(body []byte, _ net.Addr) {
 }
 
 func (c *Controller) dispatchCEMI(cemi CEMI, clientAddr *net.UDPAddr) {
+	ga := fmt.Sprintf("0x%04X", cemi.DstAddr)
+	apci := fmt.Sprintf("0x%04X", cemi.APCI)
+	c.log.Debug("knx cemi", "ga", ga, "apci", apci)
+
 	binding, ok := c.bindings[cemi.DstAddr]
 	if !ok {
-		log.Printf("knx: unknown group address 0x%04X", cemi.DstAddr)
+		c.log.Warn("knx unknown group address", "ga", ga)
 		return
 	}
 
@@ -306,15 +322,15 @@ func (c *Controller) dispatchCEMI(cemi CEMI, clientAddr *net.UDPAddr) {
 
 	case APCIGroupValueWrite:
 		if binding.Write == nil {
-			log.Printf("knx: write to read-only GA 0x%04X", cemi.DstAddr)
+			c.log.Warn("knx write to read-only GA", "ga", ga)
 			return
 		}
 		if err := binding.Write(c.svc, cemi.Data); err != nil {
-			log.Printf("knx: write error on GA 0x%04X: %v", cemi.DstAddr, err)
+			c.log.Warn("knx write failed", "ga", ga, "err", err)
 		}
 
 	default:
-		log.Printf("knx: unsupported APCI 0x%04X on GA 0x%04X", cemi.APCI, cemi.DstAddr)
+		c.log.Warn("knx unsupported APCI", "ga", ga, "apci", apci)
 	}
 }
 
@@ -342,7 +358,7 @@ func (c *Controller) heartbeatLoop(ctx context.Context) {
 		case <-ticker.C:
 			c.mu.Lock()
 			if c.client != nil && time.Since(c.client.lastSeen) > heartbeatTimeout {
-				log.Printf("knx: heartbeat timeout, dropping client")
+				c.log.Warn("knx heartbeat timeout, dropping client")
 				c.client = nil
 			}
 			c.mu.Unlock()
@@ -417,7 +433,7 @@ func (c *Controller) send(data []byte, addr *net.UDPAddr) {
 		return
 	}
 	if _, err := c.conn.WriteTo(data, addr); err != nil {
-		log.Printf("knx: send error to %v: %v", addr, err)
+		c.log.Error("knx send failed", "remote", addr.String(), "err", err)
 	}
 }
 

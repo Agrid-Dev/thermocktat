@@ -48,3 +48,7 @@ regulator:
 heat_loss:
   coefficient: 0.0001 # 0, represents conductivity. 0 for no loss.
   outdoor_temperature: 10
+
+logging:
+  level: info   # debug | info | warn | error
+  format: text  # text | json

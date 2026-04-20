@@ -100,7 +100,7 @@ func TestModbusControllerHandlers(t *testing.T) {
 
 	addr := findFreeTCPAddr(t)
 
-	ctrl, err := New(fs, Config{
+	ctrl, err := New(nil, fs, Config{
 		DeviceID:     "dev",
 		Addr:         addr,
 		UnitID:       1,
@@ -229,7 +229,7 @@ func TestModbusController32Bit(t *testing.T) {
 
 	addr := findFreeTCPAddr(t)
 
-	ctrl, err := New(fs, Config{
+	ctrl, err := New(nil, fs, Config{
 		DeviceID:      "dev",
 		Addr:          addr,
 		UnitID:        1,

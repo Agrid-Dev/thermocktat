@@ -2,6 +2,7 @@ package thermostat
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -22,10 +23,14 @@ type Thermostat struct {
 	s        Snapshot
 	reg      PIDRegulator
 	heatLoss HeatLossSimulator
+	log      *slog.Logger
 }
 
-func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams) (*Thermostat, error) {
-	t := &Thermostat{}
+func New(logger *slog.Logger, initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams) (*Thermostat, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	t := &Thermostat{log: logger}
 	if err := validateSnapshot(initial); err != nil {
 		return nil, err
 	}
@@ -63,8 +68,12 @@ func (t *Thermostat) Get() Snapshot {
 
 func (t *Thermostat) SetEnabled(on bool) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	prev := t.s.Enabled
 	t.s.Enabled = on
+	t.mu.Unlock()
+	if prev != on {
+		t.log.Info("enabled changed", "from", prev, "to", on)
+	}
 }
 
 func (t *Thermostat) Enable() {
@@ -80,8 +89,12 @@ func (t *Thermostat) SetMode(m Mode) error {
 		return ErrInvalidMode
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	prev := t.s.Mode
 	t.s.Mode = m
+	t.mu.Unlock()
+	if prev != m {
+		t.log.Info("mode changed", "from", prev.String(), "to", m.String())
+	}
 	return nil
 }
 
@@ -90,15 +103,23 @@ func (t *Thermostat) SetFanSpeed(f FanSpeed) error {
 		return ErrInvalidFanSpeed
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	prev := t.s.FanSpeed
 	t.s.FanSpeed = f
+	t.mu.Unlock()
+	if prev != f {
+		t.log.Info("fan_speed changed", "from", prev.String(), "to", f.String())
+	}
 	return nil
 }
 
 func (t *Thermostat) SetFaultCode(code int) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	prev := t.s.FaultCode
 	t.s.FaultCode = code
+	t.mu.Unlock()
+	if prev != code {
+		t.log.Info("fault_code changed", "from", prev, "to", code)
+	}
 }
 
 func (t *Thermostat) SetMinMax(min, max float64) error {
@@ -107,26 +128,33 @@ func (t *Thermostat) SetMinMax(min, max float64) error {
 	}
 
 	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	// Enforce current setpoint remains valid
 	if t.s.TemperatureSetpoint < min || t.s.TemperatureSetpoint > max {
+		t.mu.Unlock()
 		return ErrSetpointOutOfRange
 	}
-
+	prevMin, prevMax := t.s.TemperatureSetpointMin, t.s.TemperatureSetpointMax
 	t.s.TemperatureSetpointMin = min
 	t.s.TemperatureSetpointMax = max
+	t.mu.Unlock()
+	if prevMin != min || prevMax != max {
+		t.log.Info("setpoint bounds changed", "min", min, "max", max)
+	}
 	return nil
 }
 
 func (t *Thermostat) SetSetpoint(sp float64) error {
 	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	if sp < t.s.TemperatureSetpointMin || sp > t.s.TemperatureSetpointMax {
+		t.mu.Unlock()
 		return ErrSetpointOutOfRange
 	}
+	prev := t.s.TemperatureSetpoint
 	t.s.TemperatureSetpoint = sp
+	t.mu.Unlock()
+	if prev != sp {
+		t.log.Info("setpoint changed", "from", prev, "to", sp)
+	}
 	return nil
 }
 
@@ -138,7 +166,7 @@ func (t *Thermostat) setAmbient(temp float64) {
 
 func (t *Thermostat) UpdateAmbient(dt time.Duration) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	prevH, prevC := t.reg.activation()
 	var deltaReg float64
 	if t.s.Enabled {
 		deltaReg = t.reg.DeltaTemperature(t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode, dt)
@@ -146,6 +174,30 @@ func (t *Thermostat) UpdateAmbient(dt time.Duration) {
 	deltaHeatLoss := t.heatLoss.DeltaTemperature(t.s.AmbientTemperature, dt)
 	newAmbient := t.s.AmbientTemperature + deltaReg + deltaHeatLoss
 	t.setAmbient(newAmbient)
+	curH, curC := t.reg.activation()
+	setpoint, ambient, mode := t.s.TemperatureSetpoint, t.s.AmbientTemperature, t.s.Mode
+	t.mu.Unlock()
+
+	if prevH != curH || prevC != curC {
+		t.log.Info("regulation activation changed",
+			"from", activationLabel(prevH, prevC),
+			"to", activationLabel(curH, curC),
+			"setpoint", setpoint,
+			"ambient", ambient,
+			"mode", mode.String(),
+		)
+	}
+}
+
+func activationLabel(heating, cooling bool) string {
+	switch {
+	case heating:
+		return "heating"
+	case cooling:
+		return "cooling"
+	default:
+		return "off"
+	}
 }
 
 func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {

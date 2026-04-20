@@ -40,7 +40,7 @@ func newTestThermostat(t *testing.T, pidParams PIDRegulatorParams, heatLossParam
 		opt(&s)
 	}
 
-	th, err := New(s, pidParams, heatLossParams)
+	th, err := New(nil, s, pidParams, heatLossParams)
 	if err != nil {
 		t.Fatalf("New() failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestNewValidationInvalidMinMax(t *testing.T) {
 		s.TemperatureSetpointMax = 16
 	})
 
-	_, err := New(s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
+	_, err := New(nil, s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	assertError(t, err, ErrInvalidMinMax)
 }
 
@@ -61,7 +61,7 @@ func TestNewValidationInvalidFanSpeed(t *testing.T) {
 	s := newTestSnapshot(func(s *Snapshot) {
 		s.FanSpeed = FanSpeed(999)
 	})
-	_, err := New(s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
+	_, err := New(nil, s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	assertError(t, err, ErrInvalidFanSpeed)
 }
 
@@ -69,7 +69,7 @@ func TestNewValidationInvaliMode(t *testing.T) {
 	s := newTestSnapshot(func(s *Snapshot) {
 		s.Mode = Mode(999)
 	})
-	_, err := New(s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
+	_, err := New(nil, s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	assertError(t, err, ErrInvalidMode)
 }
 
@@ -77,7 +77,7 @@ func TestNewValidationInvalidSetpoint(t *testing.T) {
 	s := newTestSnapshot(func(s *Snapshot) {
 		s.TemperatureSetpoint = 4
 	})
-	_, err := New(s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
+	_, err := New(nil, s, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	assertError(t, err, ErrSetpointOutOfRange)
 }
 

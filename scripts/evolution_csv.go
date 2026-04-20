@@ -39,7 +39,7 @@ func SimulateThermostat(iterations int, filename string, setpointCommands []Setp
 		OutdoorTemperature: 10,
 	}
 
-	thermostat, err := thermostat.New(initial, pidParams, heatLoss)
+	thermostat, err := thermostat.New(nil, initial, pidParams, heatLoss)
 	if err != nil {
 		return fmt.Errorf("failed to create thermostat: %v", err)
 	}
