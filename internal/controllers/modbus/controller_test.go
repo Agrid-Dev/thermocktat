@@ -19,11 +19,12 @@ type spyThermostatService struct {
 	s  thermostat.Snapshot
 
 	// record calls
-	setEnabledCalls  []bool
-	setSetpointCalls []float64
-	setMinMaxCalls   [][2]float64
-	setModeCalls     []thermostat.Mode
-	setFanCalls      []thermostat.FanSpeed
+	setEnabledCalls   []bool
+	setSetpointCalls  []float64
+	setMinMaxCalls    [][2]float64
+	setModeCalls      []thermostat.Mode
+	setFanCalls       []thermostat.FanSpeed
+	setFaultCodeCalls []int
 }
 
 func (f *spyThermostatService) Get() thermostat.Snapshot {
@@ -65,6 +66,12 @@ func (f *spyThermostatService) SetFanSpeed(ff thermostat.FanSpeed) error {
 	f.s.FanSpeed = ff
 	f.setFanCalls = append(f.setFanCalls, ff)
 	return nil
+}
+func (f *spyThermostatService) SetFaultCode(code int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.s.FaultCode = code
+	f.setFaultCodeCalls = append(f.setFaultCodeCalls, code)
 }
 
 func findFreeTCPAddr(t *testing.T) string {

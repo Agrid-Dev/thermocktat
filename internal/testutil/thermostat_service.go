@@ -26,6 +26,9 @@ type FakeThermostatService struct {
 	SetFanSpeedCalled bool
 	SetFanSpeedArg    thermostat.FanSpeed
 	SetFanSpeedErr    error
+
+	SetFaultCodeCalled bool
+	SetFaultCodeArg    int
 }
 
 func NewFakeThermostatService() *FakeThermostatService {
@@ -90,4 +93,10 @@ func (f *FakeThermostatService) SetFanSpeed(fs thermostat.FanSpeed) error {
 	}
 	f.S.FanSpeed = fs
 	return nil
+}
+
+func (f *FakeThermostatService) SetFaultCode(code int) {
+	f.SetFaultCodeCalled = true
+	f.SetFaultCodeArg = code
+	f.S.FaultCode = code
 }

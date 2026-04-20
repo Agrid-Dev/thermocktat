@@ -14,6 +14,7 @@ type Snapshot struct {
 	Mode                   Mode
 	FanSpeed               FanSpeed
 	AmbientTemperature     float64
+	FaultCode              int
 }
 
 type Thermostat struct {
@@ -92,6 +93,12 @@ func (t *Thermostat) SetFanSpeed(f FanSpeed) error {
 	defer t.mu.Unlock()
 	t.s.FanSpeed = f
 	return nil
+}
+
+func (t *Thermostat) SetFaultCode(code int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.s.FaultCode = code
 }
 
 func (t *Thermostat) SetMinMax(min, max float64) error {

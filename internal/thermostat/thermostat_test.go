@@ -178,6 +178,13 @@ func TestSetFanSpeed(t *testing.T) {
 	assertError(t, err, nil)
 }
 
+func TestSetFaultCode(t *testing.T) {
+	th := newTestThermostat(t, PIDRegulatorParams{}, HeatLossSimulatorParams{})
+	assertEqual(t, "FaultCode default", th.Get().FaultCode, 0)
+	th.SetFaultCode(42)
+	assertEqual(t, "FaultCode", th.Get().FaultCode, 42)
+}
+
 func TestSetAmbient(t *testing.T) {
 	th := newTestThermostat(t, PIDRegulatorParams{}, HeatLossSimulatorParams{})
 	th.setAmbient(25.4)
