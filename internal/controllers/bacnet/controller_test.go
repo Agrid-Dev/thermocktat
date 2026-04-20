@@ -376,6 +376,29 @@ func TestWriteProperty_SetpointMax(t *testing.T) {
 	}
 }
 
+func TestReadProperty_FaultCode(t *testing.T) {
+	_, conn, cleanup := startController(t, func(f *testutil.FakeThermostatService) {
+		f.S.FaultCode = 7
+	})
+	defer cleanup()
+
+	val := readValue(t, conn, ObjectTypeAnalogValue, 3)
+	if val != 7 {
+		t.Fatalf("fault_code: got %f want 7", val)
+	}
+}
+
+func TestWriteProperty_FaultCode(t *testing.T) {
+	_, conn, cleanup := startController(t)
+	defer cleanup()
+
+	writeValue(t, conn, ObjectTypeAnalogValue, 3, 42)
+	val := readValue(t, conn, ObjectTypeAnalogValue, 3)
+	if val != 42 {
+		t.Fatalf("fault_code: got %f want 42", val)
+	}
+}
+
 // --- Error cases ---
 
 func TestReadProperty_UnknownObject(t *testing.T) {

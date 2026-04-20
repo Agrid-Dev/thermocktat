@@ -89,6 +89,14 @@ var objectMap = map[objectKey]property{
 		read:  func(s thermostat.Snapshot) float32 { return float32(s.FanSpeed) },
 		write: func(svc ports.ThermostatService, v float32) error { return svc.SetFanSpeed(thermostat.FanSpeed(v)) },
 	},
+	// AnalogValue 3 — fault_code (plain integer, transported as float32)
+	{ObjectTypeAnalogValue, 3}: {
+		read: func(s thermostat.Snapshot) float32 { return float32(s.FaultCode) },
+		write: func(svc ports.ThermostatService, v float32) error {
+			svc.SetFaultCode(int(v))
+			return nil
+		},
+	},
 }
 
 // Config for the BACnet controller.
