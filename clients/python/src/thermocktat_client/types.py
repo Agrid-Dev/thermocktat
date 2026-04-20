@@ -27,7 +27,7 @@ class Snapshot:
     temperature_setpoint_max: float
     mode: Mode
     fan_speed: FanSpeed
-    fault_code: int = 0
+    fault_code: int
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
