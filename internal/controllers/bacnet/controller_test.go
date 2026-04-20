@@ -40,11 +40,11 @@ func startController(t *testing.T, opts ...func(*testutil.FakeThermostatService)
 	}
 	addr := findFreeUDPAddr(t)
 
-	ctrl, err := New(nil, fake, Config{
+	ctrl, err := New(fake, Config{
 		DeviceID:       "test-dev",
 		DeviceInstance: 42,
 		Addr:           addr,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

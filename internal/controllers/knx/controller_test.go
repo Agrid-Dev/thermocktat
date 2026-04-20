@@ -20,13 +20,13 @@ func startController(t *testing.T, setup func(*testutil.FakeThermostatService)) 
 		setup(fake)
 	}
 
-	ctrl, err := New(nil, fake, Config{
+	ctrl, err := New(fake, Config{
 		DeviceID:        "test",
 		Addr:            "127.0.0.1:0",
 		PublishInterval: 1 * time.Hour, // effectively disabled for request/response tests
 		GAMain:          1,
 		GAMiddle:        0,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -482,7 +482,6 @@ func TestWriteReadBack(t *testing.T) {
 func TestStatePush(t *testing.T) {
 	// Use the real thermostat (mutex-protected) to avoid races with stateLoop.
 	svc, err := thermostat.New(
-		nil,
 		thermostat.Snapshot{
 			Enabled:                true,
 			TemperatureSetpoint:    22,
@@ -494,18 +493,19 @@ func TestStatePush(t *testing.T) {
 		},
 		thermostat.PIDRegulatorParams{Kp: 0.001, Ki: 0.001, Kd: 0.01, TargetHysteresis: 1, ModeChangeHysteresis: 2},
 		thermostat.HeatLossSimulatorParams{Coefficient: 0, OutdoorTemperature: 10},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("new thermostat: %v", err)
 	}
 
-	ctrl, err := New(nil, svc, Config{
+	ctrl, err := New(svc, Config{
 		DeviceID:        "test",
 		Addr:            "127.0.0.1:0",
 		PublishInterval: 50 * time.Millisecond,
 		GAMain:          1,
 		GAMiddle:        0,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

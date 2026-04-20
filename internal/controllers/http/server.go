@@ -21,7 +21,7 @@ type Server struct {
 }
 
 // New returns a runnable server.
-func New(logger *slog.Logger, svc ports.ThermostatService, addr string, deviceID string) *Server {
+func New(svc ports.ThermostatService, addr string, deviceID string, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

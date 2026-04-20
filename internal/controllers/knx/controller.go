@@ -42,7 +42,7 @@ type Controller struct {
 }
 
 // New creates a new KNX controller.
-func New(logger *slog.Logger, svc ports.ThermostatService, cfg Config) (*Controller, error) {
+func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

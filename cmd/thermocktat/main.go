@@ -68,7 +68,7 @@ func main() {
 	}
 
 	thermoLog := root.With("component", "thermostat")
-	th, err := thermostat.New(thermoLog, snap, regulatorParams, heatLossParams)
+	th, err := thermostat.New(snap, regulatorParams, heatLossParams, thermoLog)
 	if err != nil {
 		root.Error("thermostat init failed", "err", err)
 		os.Exit(1)
@@ -89,7 +89,7 @@ func main() {
 
 	if cfg.Controllers.HTTP.Enabled {
 		log := root.With("controller", "http")
-		srv := httpctrl.New(log, th, cfg.Controllers.HTTP.Addr, deviceID)
+		srv := httpctrl.New(th, cfg.Controllers.HTTP.Addr, deviceID, log)
 		go func() {
 			log.Info("controller started", "addr", cfg.Controllers.HTTP.Addr)
 			if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
@@ -101,7 +101,7 @@ func main() {
 
 	if cfg.Controllers.MQTT.Enabled {
 		log := root.With("controller", "mqtt")
-		mc, err := mqttctrl.New(log, th, mqttctrl.Config{
+		mc, err := mqttctrl.New(th, mqttctrl.Config{
 			DeviceID:        deviceID,
 			BrokerURL:       cfg.Controllers.MQTT.Addr,
 			ClientID:        cfg.Controllers.MQTT.ClientID,
@@ -112,7 +112,7 @@ func main() {
 			PublishMode:     cfg.Controllers.MQTT.PublishMode,
 			Username:        cfg.Controllers.MQTT.Username,
 			Password:        cfg.Controllers.MQTT.Password,
-		})
+		}, log)
 		if err != nil {
 			root.Error("mqtt init failed", "err", err)
 			os.Exit(1)
@@ -132,13 +132,13 @@ func main() {
 
 	if cfg.Controllers.MODBUS.Enabled {
 		log := root.With("controller", "modbus")
-		mc, err := modbusctrl.New(log, th, modbusctrl.Config{
+		mc, err := modbusctrl.New(th, modbusctrl.Config{
 			DeviceID:      deviceID,
 			Addr:          cfg.Controllers.MODBUS.Addr,
 			UnitID:        cfg.Controllers.MODBUS.UnitID,
 			SyncInterval:  cfg.Controllers.MODBUS.SyncInterval,
 			RegisterCount: cfg.Controllers.MODBUS.RegisterCount,
-		})
+		}, log)
 		if err != nil {
 			root.Error("modbus init failed", "err", err)
 			os.Exit(1)
@@ -157,12 +157,12 @@ func main() {
 
 	if cfg.Controllers.BACNET.Enabled {
 		log := root.With("controller", "bacnet")
-		bc, err := bacnetctrl.New(log, th, bacnetctrl.Config{
+		bc, err := bacnetctrl.New(th, bacnetctrl.Config{
 			DeviceID:       deviceID,
 			Addr:           cfg.Controllers.BACNET.Addr,
 			DeviceInstance: cfg.Controllers.BACNET.DeviceInstance,
 			SyncInterval:   cfg.Controllers.BACNET.SyncInterval,
-		})
+		}, log)
 		if err != nil {
 			root.Error("bacnet init failed", "err", err)
 			os.Exit(1)
@@ -181,13 +181,13 @@ func main() {
 
 	if cfg.Controllers.KNX.Enabled {
 		log := root.With("controller", "knx")
-		kc, err := knxctrl.New(log, th, knxctrl.Config{
+		kc, err := knxctrl.New(th, knxctrl.Config{
 			DeviceID:        deviceID,
 			Addr:            cfg.Controllers.KNX.Addr,
 			PublishInterval: cfg.Controllers.KNX.PublishInterval,
 			GAMain:          cfg.Controllers.KNX.GAMain,
 			GAMiddle:        cfg.Controllers.KNX.GAMiddle,
-		})
+		}, log)
 		if err != nil {
 			root.Error("knx init failed", "err", err)
 			os.Exit(1)

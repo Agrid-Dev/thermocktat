@@ -36,9 +36,6 @@ func NewPIDRegulator(params PIDRegulatorParams) *PIDRegulator {
 	}
 }
 
-// activation returns the current heating/cooling flags. Used by Thermostat to
-// detect activation transitions for logging without coupling the regulator to
-// an observability dependency.
 func (pid *PIDRegulator) activation() (heating, cooling bool) {
 	return pid.isHeating, pid.isCooling
 }

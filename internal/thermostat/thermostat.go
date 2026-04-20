@@ -26,7 +26,7 @@ type Thermostat struct {
 	log      *slog.Logger
 }
 
-func New(logger *slog.Logger, initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams) (*Thermostat, error) {
+func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams, logger *slog.Logger) (*Thermostat, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
@@ -196,7 +196,7 @@ func activationLabel(heating, cooling bool) string {
 	case cooling:
 		return "cooling"
 	default:
-		return "off"
+		return "idle"
 	}
 }
 

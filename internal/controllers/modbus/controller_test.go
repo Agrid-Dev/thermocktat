@@ -100,12 +100,12 @@ func TestModbusControllerHandlers(t *testing.T) {
 
 	addr := findFreeTCPAddr(t)
 
-	ctrl, err := New(nil, fs, Config{
+	ctrl, err := New(fs, Config{
 		DeviceID:     "dev",
 		Addr:         addr,
 		UnitID:       1,
 		SyncInterval: SyncInterval,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -229,13 +229,13 @@ func TestModbusController32Bit(t *testing.T) {
 
 	addr := findFreeTCPAddr(t)
 
-	ctrl, err := New(nil, fs, Config{
+	ctrl, err := New(fs, Config{
 		DeviceID:      "dev",
 		Addr:          addr,
 		UnitID:        1,
 		SyncInterval:  SyncInterval,
 		RegisterCount: 2,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
