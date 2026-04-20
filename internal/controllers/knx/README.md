@@ -64,6 +64,7 @@ Default group addresses (main=1, middle=0):
 | 1/0/4 | 4 | `ambient_temperature` | 9.001 | Read-only |
 | 1/0/5 | 5 | `mode` | 20.102 (HVAC Mode) | Read / Write |
 | 1/0/6 | 6 | `fan_speed` | 5.010 (1-byte unsigned) | Read / Write |
+| 1/0/7 | 7 | `fault_code` | 7.001 (2-byte unsigned) | Read / Write |
 
 ### Value encoding
 
@@ -71,6 +72,7 @@ Default group addresses (main=1, middle=0):
 - **Enabled** (sub 0): 1-bit compact encoding in APCI low bits. `1` = on, `0` = off.
 - **Mode** (sub 5): 1-byte unsigned. `1` = heat, `2` = cool, `3` = fan, `4` = auto.
 - **Fan Speed** (sub 6): 1-byte unsigned. `1` = auto, `2` = low, `3` = medium, `4` = high.
+- **Fault Code** (sub 7): 2-byte unsigned big-endian (DPT 7.001), plain integer.
 
 ## Not supported
 

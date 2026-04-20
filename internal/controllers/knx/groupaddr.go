@@ -16,6 +16,7 @@ const (
 	SubAmbientTemperature = 4
 	SubMode               = 5
 	SubFanSpeed           = 6
+	SubFaultCode          = 7
 )
 
 // GroupAddress computes a 3-level group address from main/middle/sub.
@@ -129,6 +130,20 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 					return fmt.Errorf("DPT 5.010: missing data")
 				}
 				return svc.SetFanSpeed(thermostat.FanSpeed(data[0]))
+			},
+		},
+		ga(SubFaultCode): {
+			DPTSize: 2,
+			Read: func(s thermostat.Snapshot) []byte {
+				v := uint16(s.FaultCode)
+				return []byte{byte(v >> 8), byte(v)}
+			},
+			Write: func(svc ports.ThermostatService, data []byte) error {
+				if len(data) < 2 {
+					return fmt.Errorf("DPT 7.001: need 2 bytes")
+				}
+				svc.SetFaultCode(int(uint16(data[0])<<8 | uint16(data[1])))
+				return nil
 			},
 		},
 	}, nil
