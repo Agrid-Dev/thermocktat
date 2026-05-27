@@ -21,5 +21,5 @@ thermocktat-client = { path = "../clients/python", editable = true }
 dev = [
     "pytest>=9.0.2",
     "ruff>=0.14.14",
-    "ty>=0.0.14",
+    "ty>=0.0.33",
 ]
