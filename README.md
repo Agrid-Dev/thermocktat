@@ -46,7 +46,8 @@ Heat losses (or gains) through room walls are also simulated and simply modeled 
 - [HTTP Controller API](internal/controllers/http/README.md)
 - [MQTT Controller API](internal/controllers/mqtt/README.md)
 - [Modbus Controller API](internal/controllers/modbus/README.md)
-- [BACnet Controller API](internal/controllers/bacnet/README.md) (Coming soon)
+- [BACnet Controller API](internal/controllers/bacnet/README.md)
+- [KNX Controller API](internal/controllers/knx/README.md)
 
 
 
