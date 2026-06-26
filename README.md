@@ -62,18 +62,13 @@ All keys can also be set via env vars, e.g. `TMK_WEATHER_PROVIDER_TYPE`, `TMK_WE
 - [HTTP Controller API](internal/controllers/http/README.md)
 - [MQTT Controller API](internal/controllers/mqtt/README.md)
 - [Modbus Controller API](internal/controllers/modbus/README.md)
-- [BACnet Controller API](internal/controllers/bacnet/README.md) (Coming soon)
-
+- [BACnet Controller API](internal/controllers/bacnet/README.md)
+- [KNX Controller API](internal/controllers/knx/README.md)
 
 
 ## Configuration
 
 Thermocktat can be configured from a file (see `cmd/app/config_defaults.yaml`).
-
-Usage:
-```sh
-go run ./cmd/thermocktat -config config.yaml
-```
 
 Configuration can also be passed using environment variables with the `TMK_` prefix. **Environment variables have priority over config file**.
 
@@ -81,25 +76,9 @@ If no config is provided, default values will be used (values from `cmd/app/conf
 
 For each controller, the `addr` field is in the format `host:port` (`host` will be `localhost` by default). For most controllers, it is used to set the url that the server will expose. For `mqtt`, `addr` is the address of the broker.
 
-## Usage
+## Running with Docker
 
-### Run directly
-
-```sh
-TMK_CONTROLLER=http \
-TMK_ADDR=:8080 \
-go run ./cmd/thermocktat
-```
-
-### Compile and run binary
-
-```sh
-go build -o thermocktat ./cmd/thermocktat
-
-./thermocktat -config config.yaml
-```
-
-## Docker Examples
+Thermocktat is primarily distributed as a Docker image.
 
 ```sh
 # Run with default params
@@ -116,38 +95,9 @@ docker run --rm -e TMK_CONTROLLER=modbus -e TMK_ADDR=0.0.0.0:1502 -e TMK_DEVICE_
 docker run -v $(pwd)/config.yaml:/config.yaml -p 8080:8080 thermocktat -config /config.yaml
 ```
 
-## CI/CD
+## Contributing
 
-Two GitHub Actions workflows handle CI and releases separately.
-
-### CI (`.github/workflows/ci.yaml`)
-
-Runs on PRs (and `workflow_dispatch`). Main is protected — all changes go through PRs.
-
-```
-test-lint-build ──→ integration-tests ──┐
-                                        ├──→ docker-push
-docker-build ──→ docker-scan ───────────┘
-```
-
-- **test-lint-build**: Go quality checks (gofmt, goimports, go vet, gopls), unit tests with coverage, binary build.
-- **docker-build**: Builds `linux/amd64` and `linux/arm64` images in parallel, uploads as artifacts.
-- **docker-scan**: Runs [Trivy](https://github.com/aquasecurity/trivy) vulnerability scan on the built image. Fails on CRITICAL/HIGH CVEs.
-- **integration-tests**: Python (pytest) end-to-end tests for each controller protocol.
-- **docker-push**: After all checks pass, pushes the validated images to `ghcr.io` tagged with the PR number (e.g., `:pr-42`).
-
-### Release (`.github/workflows/release.yaml`)
-
-Runs on tag pushes. Finds the merged PR for the tagged commit, retags its `:pr-N` image with the version and `latest` — no rebuild. Signs the image with [cosign](https://github.com/sigstore/cosign) (keyless) and creates a GitHub Release with an auto-generated changelog.
-
-### Releasing
-
-```sh
-git tag v0.7.0
-git push origin v0.7.0
-```
-
-The release workflow finds the merged PR for that commit, locates the corresponding `:pr-N` image, retags it, signs it, and creates the GitHub Release.
+Want to build from source, run the tests, or open a pull request? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
