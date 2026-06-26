@@ -22,7 +22,7 @@ Thermocktat has many configurable parameters (for controllers, initial state, re
 
 ## Architecture
 
-Controllers (modbus, bacnet, http, mqtt) depend on the `ThermostatService` interface defined in `internal/ports/thermostat.go`, not on the concrete thermostat. This is the key decoupling boundary.
+Ports & adapters (hexagonal): the core `internal/thermostat` owns both its ports in `internal/thermostat/port.go` — `Service` (inbound, the control API controllers call) and `WeatherProvider` (outbound, the outdoor-temperature source). Controllers (modbus, bacnet, http, mqtt, knx) depend on `thermostat.Service`; weather adapters (`internal/weather`) implement `thermostat.WeatherProvider`; `cmd/` is the composition root. Dependencies point inward — this is the key decoupling boundary.
 
 ## Running locally
 

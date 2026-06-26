@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -45,14 +44,14 @@ type Config struct {
 }
 
 type Controller struct {
-	svc ports.ThermostatService
+	svc thermostat.Service
 	cfg Config
 	log *slog.Logger
 
 	client mqtt.Client
 }
 
-func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+func New(svc thermostat.Service, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

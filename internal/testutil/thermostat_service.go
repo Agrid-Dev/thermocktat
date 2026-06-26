@@ -2,7 +2,9 @@ package testutil
 
 import "github.com/Agrid-Dev/thermocktat/internal/thermostat"
 
-// FakeThermostatService is a reusable fake implementing ports.ThermostatService.
+var _ thermostat.Service = (*FakeThermostatService)(nil)
+
+// FakeThermostatService is a reusable fake implementing thermostat.Service.
 // Put ONLY what multiple test packages need here.
 type FakeThermostatService struct {
 	S thermostat.Snapshot

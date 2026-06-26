@@ -11,7 +11,6 @@ import (
 
 	mbserver "github.com/tbrandon/mbserver"
 
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
@@ -40,14 +39,14 @@ const (
 )
 
 type Controller struct {
-	svc ports.ThermostatService
+	svc thermostat.Service
 	cfg Config
 	log *slog.Logger
 
 	serv *mbserver.Server
 }
 
-func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+func New(svc thermostat.Service, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

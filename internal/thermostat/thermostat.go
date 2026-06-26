@@ -26,12 +26,6 @@ type Thermostat struct {
 	log      *slog.Logger
 }
 
-// OutdoorTemperatureProvider mirrors ports.WeatherProvider, redeclared here
-// because ports imports thermostat (declaring it there would cycle).
-type OutdoorTemperatureProvider interface {
-	OutdoorTemperature(ctx context.Context) (float64, error)
-}
-
 func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams, logger *slog.Logger) (*Thermostat, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
@@ -231,7 +225,7 @@ func (t *Thermostat) SetOutdoorTemperature(temp float64) {
 // RunWeatherRefresh polls provider into the heat-loss simulation, fetching once
 // immediately then every interval until ctx is cancelled. A nil provider or
 // non-positive interval disables it.
-func (t *Thermostat) RunWeatherRefresh(ctx context.Context, provider OutdoorTemperatureProvider, interval time.Duration) error {
+func (t *Thermostat) RunWeatherRefresh(ctx context.Context, provider WeatherProvider, interval time.Duration) error {
 	if provider == nil || interval <= 0 {
 		return nil
 	}
@@ -251,7 +245,7 @@ func (t *Thermostat) RunWeatherRefresh(ctx context.Context, provider OutdoorTemp
 	}
 }
 
-func (t *Thermostat) refreshOutdoorTemperature(ctx context.Context, provider OutdoorTemperatureProvider) {
+func (t *Thermostat) refreshOutdoorTemperature(ctx context.Context, provider WeatherProvider) {
 	temp, err := provider.OutdoorTemperature(ctx)
 	if err != nil {
 		t.log.Warn("outdoor temperature refresh failed", "err", err)

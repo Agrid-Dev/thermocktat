@@ -73,9 +73,52 @@ All quality checks are enforced in CI; please run them locally before opening a 
 - `ruff format --check .` — formatting
 - `ty check` — type checking
 
-## Architecture notes
+## Architecture
 
-Controllers (`modbus`, `bacnet`, `http`, `mqtt`, `knx`) depend on the `ThermostatService` interface defined in `internal/ports/thermostat.go`, not on the concrete thermostat. This is the key decoupling boundary — keep new controllers on the same side of it.
+Thermocktat follows a **ports & adapters (hexagonal)** layout. The core (`internal/thermostat`) holds the domain — the `Thermostat` with its `PIDRegulator` and `HeatLossSimulator` — and *owns both of its ports* (`internal/thermostat/port.go`):
+
+- **`Service`** — the inbound (driving) port: the control API the controllers call.
+- **`WeatherProvider`** — the outbound (driven) port: the outdoor temperature the heat-loss simulation needs.
+
+Dependencies point inward — adapters depend on the core, never the reverse:
+
+- **Driving adapters** (`internal/controllers/*`: http, mqtt, modbus, bacnet, knx) take a `thermostat.Service`; they never see the concrete `*Thermostat`.
+- **Driven adapters** (`internal/weather`: `Static`, `OpenMeteo`) implement `thermostat.WeatherProvider`.
+- **`cmd/`** is the composition root: it builds the concrete thermostat and adapters and wires them together.
+
+This is the key decoupling boundary — keep new controllers behind `thermostat.Service`, and new outdoor-temperature sources behind `thermostat.WeatherProvider`. Test at those seams (see `internal/testutil` for the shared fakes).
+
+```mermaid
+flowchart LR
+    subgraph driving["Driving adapters · internal/controllers"]
+        direction TB
+        http
+        mqtt
+        modbus
+        bacnet
+        knx
+    end
+
+    subgraph hexcore["Core · internal/thermostat"]
+        direction TB
+        inport["«inbound port»<br/>Service"]
+        domain["Thermostat<br/>PIDRegulator<br/>HeatLossSimulator"]
+        outport["«outbound port»<br/>WeatherProvider"]
+        inport --> domain --> outport
+    end
+
+    subgraph driven["Driven adapters · internal/weather"]
+        direction TB
+        static["Static"]
+        openmeteo["OpenMeteo"]
+    end
+
+    http & mqtt & modbus & bacnet & knx -->|call| inport
+    static & openmeteo -.->|implement| outport
+    cmd["cmd/ · composition root"] -.->|build + wire| driving
+    cmd -.-> domain
+    cmd -.-> driven
+```
 
 The app is distributed as a Docker image (see `Dockerfile`) and must stay lightweight: we want to run 100+ instances on a single machine to simulate a real building. Be mindful of image size and resource usage in changes.
 
