@@ -1,6 +1,6 @@
 module github.com/Agrid-Dev/thermocktat
 
-go 1.25.2
+go 1.26.0
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
