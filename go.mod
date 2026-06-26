@@ -1,6 +1,6 @@
 module github.com/Agrid-Dev/thermocktat
 
-go 1.25.2
+go 1.26.0
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
@@ -26,7 +26,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )
