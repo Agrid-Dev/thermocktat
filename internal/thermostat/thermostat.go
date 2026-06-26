@@ -22,8 +22,14 @@ type Thermostat struct {
 	mu       sync.RWMutex
 	s        Snapshot
 	reg      PIDRegulator
-	heatLoss HeatLossSimulator
+	heatLoss *HeatLossSimulator
 	log      *slog.Logger
+}
+
+// OutdoorTemperatureProvider mirrors ports.WeatherProvider, redeclared here
+// because ports imports thermostat (declaring it there would cycle).
+type OutdoorTemperatureProvider interface {
+	OutdoorTemperature(ctx context.Context) (float64, error)
 }
 
 func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLossSimulatorParams, logger *slog.Logger) (*Thermostat, error) {
@@ -40,7 +46,7 @@ func New(initial Snapshot, pidParams PIDRegulatorParams, heatLossParams HeatLoss
 	if err != nil {
 		return nil, err
 	}
-	t.heatLoss = *heatLoss
+	t.heatLoss = heatLoss
 	return t, nil
 }
 
@@ -212,4 +218,44 @@ func (t *Thermostat) Run(ctx context.Context, interval time.Duration) error {
 			t.UpdateAmbient(interval)
 		}
 	}
+}
+
+func (t *Thermostat) SetOutdoorTemperature(temp float64) {
+	prev := t.heatLoss.OutdoorTemperature()
+	t.heatLoss.SetOutdoorTemperature(temp)
+	if prev != temp {
+		t.log.Info("outdoor temperature changed", "from", prev, "to", temp)
+	}
+}
+
+// RunWeatherRefresh polls provider into the heat-loss simulation, fetching once
+// immediately then every interval until ctx is cancelled. A nil provider or
+// non-positive interval disables it.
+func (t *Thermostat) RunWeatherRefresh(ctx context.Context, provider OutdoorTemperatureProvider, interval time.Duration) error {
+	if provider == nil || interval <= 0 {
+		return nil
+	}
+
+	t.refreshOutdoorTemperature(ctx, provider)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			t.refreshOutdoorTemperature(ctx, provider)
+		}
+	}
+}
+
+func (t *Thermostat) refreshOutdoorTemperature(ctx context.Context, provider OutdoorTemperatureProvider) {
+	temp, err := provider.OutdoorTemperature(ctx)
+	if err != nil {
+		t.log.Warn("outdoor temperature refresh failed", "err", err)
+		return
+	}
+	t.SetOutdoorTemperature(temp)
 }

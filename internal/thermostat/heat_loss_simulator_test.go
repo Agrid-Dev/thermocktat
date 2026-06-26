@@ -39,6 +39,29 @@ func TestValidateParams(t *testing.T) {
 	}
 }
 
+func TestSetOutdoorTemperatureChangesDelta(t *testing.T) {
+	sim, err := NewHeatLossSimulator(HeatLossSimulatorParams{OutdoorTemperature: 10, Coefficient: 5})
+	if err != nil {
+		t.Fatalf("new simulator: %v", err)
+	}
+
+	// Indoor below 30 -> warming (positive delta) once outdoor is raised.
+	before := sim.DeltaTemperature(20, time.Second)
+	if before >= 0 {
+		t.Fatalf("expected cooling toward 10 (negative delta), got %v", before)
+	}
+
+	sim.SetOutdoorTemperature(30)
+
+	if got := sim.OutdoorTemperature(); got != 30 {
+		t.Fatalf("OutdoorTemperature() = %v, want 30", got)
+	}
+	after := sim.DeltaTemperature(20, time.Second)
+	if after <= 0 {
+		t.Fatalf("expected warming toward 30 (positive delta) after update, got %v", after)
+	}
+}
+
 func TestHeatLossDeltaTemperature(t *testing.T) {
 	tests := []struct {
 		name        string

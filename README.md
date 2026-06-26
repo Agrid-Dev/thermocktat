@@ -42,6 +42,22 @@ Regulation params can be set in the `config.yaml` file (see `cmd/app/config_defa
 
 Heat losses (or gains) through room walls are also simulated and simply modeled by a conduction coefficient. A temperature delta proportional to the difference between outdoor and ambient temperatures and to this coefficient is added to the ambient temperature every second. The heat loss coefficient represents the room's thermal condictivity (the higher the coefficient, the higher the loss). It can be configured in the `heat_loss` section of the config file (see `cmd/app/config_defaults.yaml`). Set to 0 for no heat loss.
 
+The outdoor temperature is supplied by a configurable **weather provider** (`weather_provider` section):
+
+- `static` (default): a fixed outdoor temperature, taken from `weather_provider.static.outdoor_temperature`, or from `heat_loss.outdoor_temperature` when unset.
+- `open-meteo`: fetches the current temperature for a `latitude`/`longitude` from the free [Open-Meteo](https://open-meteo.com) API (no key required), refreshed every `refresh_interval` (default `1h`). The last known value is kept if a refresh fails.
+
+```yaml
+weather_provider:
+  type: open-meteo        # static | open-meteo
+  refresh_interval: 1h
+  open_meteo:
+    latitude: 48.8566
+    longitude: 2.3522
+```
+
+All keys can also be set via env vars, e.g. `TMK_WEATHER_PROVIDER_TYPE`, `TMK_WEATHER_PROVIDER_OPEN_METEO_LATITUDE`.
+
 ## API Documentation
 - [HTTP Controller API](internal/controllers/http/README.md)
 - [MQTT Controller API](internal/controllers/mqtt/README.md)

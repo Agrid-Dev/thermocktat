@@ -47,7 +47,16 @@ regulator:
 
 heat_loss:
   coefficient: 0.0001 # 0, represents conductivity. 0 for no loss.
-  outdoor_temperature: 10
+  outdoor_temperature: 10 # used as the static outdoor temperature unless overridden below
+
+weather_provider:
+  type: static          # static | open-meteo
+  refresh_interval: 1h  # how often the dynamic provider is polled
+  static:
+    # outdoor_temperature: 10.0  # overrides heat_loss.outdoor_temperature when set
+  open_meteo:
+    latitude: 48.8566   # Paris
+    longitude: 2.3522
 
 logging:
   level: info   # debug | info | warn | error

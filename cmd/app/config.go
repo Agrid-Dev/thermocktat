@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,9 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/Agrid-Dev/thermocktat/internal/logging"
+	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
+	"github.com/Agrid-Dev/thermocktat/internal/weather"
 )
 
 //go:embed config_defaults.yaml
@@ -42,10 +45,11 @@ type Config struct {
 		KNX    KNXConfig    `koanf:"knx" json:"knx" yaml:"knx"`
 	} `koanf:"controllers" json:"controllers" yaml:"controllers"`
 
-	Thermostat ThermostatConfig `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
-	Regulator  RegulatorConfig  `koanf:"regulator" json:"regulator" yaml:"regulator"`
-	HeatLoss   HeatLossConfig   `koanf:"heat_loss" json:"heat_loss" yaml:"heat_loss"`
-	Logging    logging.Config   `koanf:"logging" json:"logging" yaml:"logging"`
+	Thermostat ThermostatConfig      `koanf:"thermostat" json:"thermostat" yaml:"thermostat"`
+	Regulator  RegulatorConfig       `koanf:"regulator" json:"regulator" yaml:"regulator"`
+	HeatLoss   HeatLossConfig        `koanf:"heat_loss" json:"heat_loss" yaml:"heat_loss"`
+	Weather    WeatherProviderConfig `koanf:"weather_provider" json:"weather_provider" yaml:"weather_provider"`
+	Logging    logging.Config        `koanf:"logging" json:"logging" yaml:"logging"`
 }
 
 type ThermostatConfig struct {
@@ -74,6 +78,24 @@ type RegulatorConfig struct {
 type HeatLossConfig struct {
 	Coefficient        float64 `koanf:"coefficient" json:"coefficient" yaml:"coefficient"`
 	OutdoorTemperature float64 `koanf:"outdoor_temperature" json:"outdoor_temperature" yaml:"outdoor_temperature"`
+}
+
+type WeatherProviderConfig struct {
+	Type            string        `koanf:"type" json:"type" yaml:"type"` // static | open-meteo
+	RefreshInterval time.Duration `koanf:"refresh_interval" json:"refresh_interval" yaml:"refresh_interval"`
+
+	Static    StaticWeatherConfig    `koanf:"static" json:"static" yaml:"static"`
+	OpenMeteo OpenMeteoWeatherConfig `koanf:"open_meteo" json:"open_meteo" yaml:"open_meteo"`
+}
+
+type StaticWeatherConfig struct {
+	// Falls back to heat_loss.outdoor_temperature when nil.
+	OutdoorTemperature *float64 `koanf:"outdoor_temperature" json:"outdoor_temperature" yaml:"outdoor_temperature"`
+}
+
+type OpenMeteoWeatherConfig struct {
+	Latitude  float64 `koanf:"latitude" json:"latitude" yaml:"latitude"`
+	Longitude float64 `koanf:"longitude" json:"longitude" yaml:"longitude"`
 }
 
 type HTTPConfig struct {
@@ -242,6 +264,21 @@ func envKeyTransform(k string) string {
 		field := strings.Join(parts[2:], "_")
 		return "heat_loss." + field
 
+	case "weather": // weather_provider_<field...> -> weather_provider.<field>, with nested open_meteo.*/static.*
+		if len(parts) < 3 {
+			return key
+		}
+		field := strings.Join(parts[2:], "_")
+		switch {
+		case strings.HasPrefix(field, "open_meteo_"):
+			return "weather_provider.open_meteo." + strings.TrimPrefix(field, "open_meteo_")
+		case strings.HasPrefix(field, "static_"):
+			return "weather_provider.static." + strings.TrimPrefix(field, "static_")
+		default:
+			// type, refresh_interval
+			return "weather_provider." + field
+		}
+
 	case "logging":
 		// logging_<field> -> logging.<field>
 		if len(parts) < 2 {
@@ -332,7 +369,36 @@ func validate(cfg Config) error {
 		return errors.New("controllers.modbus.sync_interval must be >= 0")
 	}
 
+	switch weatherType(cfg) {
+	case "static":
+	case "open-meteo":
+		if lat := cfg.Weather.OpenMeteo.Latitude; lat < -90 || lat > 90 {
+			return fmt.Errorf("weather_provider.open_meteo.latitude %v out of range [-90, 90]", lat)
+		}
+		if lon := cfg.Weather.OpenMeteo.Longitude; lon < -180 || lon > 180 {
+			return fmt.Errorf("weather_provider.open_meteo.longitude %v out of range [-180, 180]", lon)
+		}
+	default:
+		return fmt.Errorf("invalid weather_provider.type %q (expected static|open-meteo)", cfg.Weather.Type)
+	}
+	if cfg.Weather.RefreshInterval < 0 {
+		return errors.New("weather_provider.refresh_interval must be >= 0")
+	}
+
 	return nil
+}
+
+// weatherType normalizes the provider type; empty defaults to "static", unknown
+// values are returned verbatim for callers to reject.
+func weatherType(cfg Config) string {
+	switch t := strings.ToLower(strings.TrimSpace(cfg.Weather.Type)); t {
+	case "", "static":
+		return "static"
+	case "open-meteo", "open_meteo", "openmeteo":
+		return "open-meteo"
+	default:
+		return t
+	}
 }
 
 func (c Config) Snapshot() (thermostat.Snapshot, error) {
@@ -416,4 +482,25 @@ func (c Config) HeatLossParams() (thermostat.HeatLossSimulatorParams, error) {
 		return thermostat.HeatLossSimulatorParams{}, err
 	}
 	return params, nil
+}
+
+// WeatherProvider builds the provider selected by weather_provider.type.
+func (c Config) WeatherProvider(logger *slog.Logger) (ports.WeatherProvider, error) {
+	switch weatherType(c) {
+	case "static":
+		temp := c.HeatLoss.OutdoorTemperature
+		if c.Weather.Static.OutdoorTemperature != nil {
+			temp = *c.Weather.Static.OutdoorTemperature
+		}
+		return weather.NewStatic(temp), nil
+	case "open-meteo":
+		return weather.NewOpenMeteo(weather.OpenMeteoConfig{
+			Latitude:        c.Weather.OpenMeteo.Latitude,
+			Longitude:       c.Weather.OpenMeteo.Longitude,
+			RefreshInterval: c.Weather.RefreshInterval,
+			Logger:          logger,
+		}), nil
+	default:
+		return nil, fmt.Errorf("invalid weather_provider.type %q (expected static|open-meteo)", c.Weather.Type)
+	}
 }
