@@ -74,6 +74,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	weatherLog := root.With("component", "weather", "provider", cfg.Weather.Type)
+	weatherProvider, err := cfg.WeatherProvider(weatherLog)
+	if err != nil {
+		root.Error("weather provider init failed", "err", err)
+		os.Exit(1)
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -83,6 +90,14 @@ func main() {
 	go func() {
 		if err := th.Run(ctx, cfg.Regulator.Interval); err != nil && !errors.Is(err, context.Canceled) {
 			thermoLog.Error("thermostat exited", "err", err)
+			cancel()
+		}
+	}()
+
+	// start outdoor-temperature refresh
+	go func() {
+		if err := th.RunWeatherRefresh(ctx, weatherProvider, cfg.Weather.RefreshInterval); err != nil && !errors.Is(err, context.Canceled) {
+			weatherLog.Error("weather refresh exited", "err", err)
 			cancel()
 		}
 	}()
