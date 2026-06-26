@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
@@ -31,7 +30,7 @@ type clientState struct {
 
 // Controller implements a KNXnet/IP tunneling server.
 type Controller struct {
-	svc      ports.ThermostatService
+	svc      thermostat.Service
 	cfg      Config
 	bindings map[uint16]Binding
 	log      *slog.Logger
@@ -42,7 +41,7 @@ type Controller struct {
 }
 
 // New creates a new KNX controller.
-func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+func New(svc thermostat.Service, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

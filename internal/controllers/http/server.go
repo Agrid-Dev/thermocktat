@@ -9,19 +9,18 @@ import (
 	"time"
 
 	"github.com/Agrid-Dev/thermocktat/internal/buildinfo"
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
 type Server struct {
-	svc      ports.ThermostatService
+	svc      thermostat.Service
 	srv      *http.Server
 	deviceID string
 	log      *slog.Logger
 }
 
 // New returns a runnable server.
-func New(svc ports.ThermostatService, addr string, deviceID string, logger *slog.Logger) *Server {
+func New(svc thermostat.Service, addr string, deviceID string, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}

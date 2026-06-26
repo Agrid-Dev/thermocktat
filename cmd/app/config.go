@@ -20,7 +20,6 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/Agrid-Dev/thermocktat/internal/logging"
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 	"github.com/Agrid-Dev/thermocktat/internal/weather"
 )
@@ -485,7 +484,7 @@ func (c Config) HeatLossParams() (thermostat.HeatLossSimulatorParams, error) {
 }
 
 // WeatherProvider builds the provider selected by weather_provider.type.
-func (c Config) WeatherProvider(logger *slog.Logger) (ports.WeatherProvider, error) {
+func (c Config) WeatherProvider(logger *slog.Logger) (thermostat.WeatherProvider, error) {
 	switch weatherType(c) {
 	case "static":
 		temp := c.HeatLoss.OutdoorTemperature

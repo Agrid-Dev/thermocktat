@@ -3,7 +3,11 @@ package testutil
 import (
 	"context"
 	"sync"
+
+	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
+
+var _ thermostat.WeatherProvider = (*FakeWeatherProvider)(nil)
 
 // FakeWeatherProvider returns Temps in sequence, repeating the last one once
 // exhausted, or Err when set. Safe for concurrent use.

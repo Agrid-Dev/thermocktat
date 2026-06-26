@@ -3,7 +3,6 @@ package knxctrl
 import (
 	"fmt"
 
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 )
 
@@ -31,7 +30,7 @@ type Binding struct {
 	// 0 means compact encoding (DPT 1.001: value in APCI low bits).
 	DPTSize int
 	Read    func(thermostat.Snapshot) []byte
-	Write   func(ports.ThermostatService, []byte) error // nil = read-only
+	Write   func(thermostat.Service, []byte) error // nil = read-only
 }
 
 // BuildBindingMap creates the GA→Binding map from the configured main/middle groups.
@@ -51,7 +50,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 			Read: func(s thermostat.Snapshot) []byte {
 				return []byte{EncodeDPT1(s.Enabled)}
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 1 {
 					return fmt.Errorf("DPT 1.001: missing data")
 				}
@@ -65,7 +64,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 				b := EncodeDPT9(s.TemperatureSetpoint)
 				return b[:]
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 2 {
 					return fmt.Errorf("DPT 9.001: need 2 bytes")
 				}
@@ -78,7 +77,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 				b := EncodeDPT9(s.TemperatureSetpointMin)
 				return b[:]
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 2 {
 					return fmt.Errorf("DPT 9.001: need 2 bytes")
 				}
@@ -92,7 +91,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 				b := EncodeDPT9(s.TemperatureSetpointMax)
 				return b[:]
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 2 {
 					return fmt.Errorf("DPT 9.001: need 2 bytes")
 				}
@@ -113,7 +112,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 			Read: func(s thermostat.Snapshot) []byte {
 				return []byte{byte(s.Mode)}
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 1 {
 					return fmt.Errorf("DPT 20.102: missing data")
 				}
@@ -125,7 +124,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 			Read: func(s thermostat.Snapshot) []byte {
 				return []byte{byte(s.FanSpeed)}
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 1 {
 					return fmt.Errorf("DPT 5.010: missing data")
 				}
@@ -138,7 +137,7 @@ func BuildBindingMap(cfg Config) (map[uint16]Binding, error) {
 				v := uint16(s.FaultCode)
 				return []byte{byte(v >> 8), byte(v)}
 			},
-			Write: func(svc ports.ThermostatService, data []byte) error {
+			Write: func(svc thermostat.Service, data []byte) error {
 				if len(data) < 2 {
 					return fmt.Errorf("DPT 7.001: need 2 bytes")
 				}

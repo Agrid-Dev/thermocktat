@@ -1,8 +1,17 @@
-// Package weather provides ports.WeatherProvider implementations: a fixed
+// Package weather provides thermostat.WeatherProvider implementations: a fixed
 // static value and a dynamic Open-Meteo client.
 package weather
 
-import "context"
+import (
+	"context"
+
+	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
+)
+
+var (
+	_ thermostat.WeatherProvider = (*Static)(nil)
+	_ thermostat.WeatherProvider = (*OpenMeteo)(nil)
+)
 
 // Static always returns the same outdoor temperature.
 type Static struct {

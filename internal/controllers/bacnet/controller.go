@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Agrid-Dev/thermocktat/internal/ports"
 	"github.com/Agrid-Dev/thermocktat/internal/thermostat"
 	"github.com/ulbios/bacnet"
 	"github.com/ulbios/bacnet/objects"
@@ -35,7 +34,7 @@ type objectKey struct {
 // property describes how a BACnet object maps to a thermostat field.
 type property struct {
 	read  func(s thermostat.Snapshot) float32
-	write func(svc ports.ThermostatService, v float32) error // nil = read-only
+	write func(svc thermostat.Service, v float32) error // nil = read-only
 }
 
 // objectMap maps BACnet objects to thermostat fields.
@@ -48,12 +47,12 @@ var objectMap = map[objectKey]property{
 	// AnalogValue 0 — temperature_setpoint
 	{ObjectTypeAnalogValue, 0}: {
 		read:  func(s thermostat.Snapshot) float32 { return float32(s.TemperatureSetpoint) },
-		write: func(svc ports.ThermostatService, v float32) error { return svc.SetSetpoint(float64(v)) },
+		write: func(svc thermostat.Service, v float32) error { return svc.SetSetpoint(float64(v)) },
 	},
 	// AnalogValue 1 — temperature_setpoint_min
 	{ObjectTypeAnalogValue, 1}: {
 		read: func(s thermostat.Snapshot) float32 { return float32(s.TemperatureSetpointMin) },
-		write: func(svc ports.ThermostatService, v float32) error {
+		write: func(svc thermostat.Service, v float32) error {
 			cur := svc.Get()
 			return svc.SetMinMax(float64(v), cur.TemperatureSetpointMax)
 		},
@@ -61,7 +60,7 @@ var objectMap = map[objectKey]property{
 	// AnalogValue 2 — temperature_setpoint_max
 	{ObjectTypeAnalogValue, 2}: {
 		read: func(s thermostat.Snapshot) float32 { return float32(s.TemperatureSetpointMax) },
-		write: func(svc ports.ThermostatService, v float32) error {
+		write: func(svc thermostat.Service, v float32) error {
 			cur := svc.Get()
 			return svc.SetMinMax(cur.TemperatureSetpointMin, float64(v))
 		},
@@ -74,7 +73,7 @@ var objectMap = map[objectKey]property{
 			}
 			return 0
 		},
-		write: func(svc ports.ThermostatService, v float32) error {
+		write: func(svc thermostat.Service, v float32) error {
 			svc.SetEnabled(v != 0)
 			return nil
 		},
@@ -82,17 +81,17 @@ var objectMap = map[objectKey]property{
 	// MultiStateValue 0 — mode (1=heat, 2=cool, 3=fan, 4=auto)
 	{ObjectTypeMultiStateValue, 0}: {
 		read:  func(s thermostat.Snapshot) float32 { return float32(s.Mode) },
-		write: func(svc ports.ThermostatService, v float32) error { return svc.SetMode(thermostat.Mode(v)) },
+		write: func(svc thermostat.Service, v float32) error { return svc.SetMode(thermostat.Mode(v)) },
 	},
 	// MultiStateValue 1 — fan_speed (1=auto, 2=low, 3=medium, 4=high)
 	{ObjectTypeMultiStateValue, 1}: {
 		read:  func(s thermostat.Snapshot) float32 { return float32(s.FanSpeed) },
-		write: func(svc ports.ThermostatService, v float32) error { return svc.SetFanSpeed(thermostat.FanSpeed(v)) },
+		write: func(svc thermostat.Service, v float32) error { return svc.SetFanSpeed(thermostat.FanSpeed(v)) },
 	},
 	// AnalogValue 3 — fault_code (plain integer, transported as float32)
 	{ObjectTypeAnalogValue, 3}: {
 		read: func(s thermostat.Snapshot) float32 { return float32(s.FaultCode) },
-		write: func(svc ports.ThermostatService, v float32) error {
+		write: func(svc thermostat.Service, v float32) error {
 			svc.SetFaultCode(int(v))
 			return nil
 		},
@@ -113,7 +112,7 @@ type Config struct {
 }
 
 type Controller struct {
-	svc ports.ThermostatService
+	svc thermostat.Service
 	cfg Config
 	log *slog.Logger
 
@@ -122,7 +121,7 @@ type Controller struct {
 }
 
 // New creates a BACnet controller. DeviceInstance must be in the BACnet range 0..4194303.
-func New(svc ports.ThermostatService, cfg Config, logger *slog.Logger) (*Controller, error) {
+func New(svc thermostat.Service, cfg Config, logger *slog.Logger) (*Controller, error) {
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
